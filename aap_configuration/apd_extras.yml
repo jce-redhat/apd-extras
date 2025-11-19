@@ -7,9 +7,11 @@ eda_credentials:
     organization: Ansible Product Demos (APD)
     inputs:
       host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.com") }}'
-      username: '{{ lookup("env","AAP_USERNAME") | default("admin") }}'
-      password: '{{ lookup("env","AAP_PASSWORD") | default("REPLACEME") }}'
-      verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(false) }}'
+      username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
+      password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
+      oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
+      verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
+      request_timeout: '{{ lookup("env","AAP_REQUEST_TIMEOUT") | default(omit) }}'
 
 eda_projects:
   - name: APD Extras
