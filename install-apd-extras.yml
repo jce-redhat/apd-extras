@@ -3,10 +3,16 @@
   hosts: localhost
   gather_facts: false
 
-  vars_files:
-    - vars/apd_extras.yml
-
   tasks:
+    - name: Include aap_configuration variables
+      ansible.builtin.include_vars:
+        dir: aap_configuration
+        extensions:
+          - yml
+          - yaml
+        ignore_files: '{{ apd_extras_ignore_files | default([]) }}'
+        ignore_unknown_extensions: true
+
     - name: Run aap_configuration dispatcher
       ansible.builtin.include_role:
         name: infra.aap_configuration.dispatch
