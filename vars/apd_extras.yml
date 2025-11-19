@@ -27,5 +27,7 @@ eda_rulebook_activations:
     decision_environment: Default Decision Environment
     project: APD Extras
     rulebook: check-url.yml
+    extra_vars:
+      web_server_debug: true
 
 ...
