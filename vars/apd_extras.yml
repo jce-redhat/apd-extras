@@ -1,0 +1,31 @@
+---
+eda_credentials:
+  - name: AAP Credential
+    description: AAP credential for EDA projects
+    state: present
+    credential_type: Red Hat Ansible Automation Platform
+    organization: Ansible Product Demos (APD)
+    inputs:
+      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.com") }}'
+      username: '{{ lookup("env","AAP_USERNAME") | default("admin") }}'
+      password: '{{ lookup("env","AAP_PASSWORD") | default("REPLACEME") }}'
+      verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(false) }}'
+
+eda_projects:
+  - name: APD Extras
+    description: Additional AAP resources for use with Ansible Product Demos
+    state: present
+    url: https://github.com/jce-redhat/apd-extras.git
+    organization: Ansible Product Demos (APD)
+
+eda_rulebook_activations:
+  - name: Check web server URL
+    description: Check availability of a URL, and restart the web server if needed
+    state: present
+    enabled: false
+    organization: Ansible Product Demos (APD)
+    decision_environment: Default Decision Environment
+    project: APD Extras
+    rulebook: check-url.yml
+
+...

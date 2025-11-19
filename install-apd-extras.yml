@@ -1,0 +1,15 @@
+---
+- name: Install APD extras
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - vars/apd_extras.yml
+
+  tasks:
+    - name: Run aap_configuration dispatcher
+      ansible.builtin.include_role:
+        name: infra.aap_configuration.dispatch
+
+...
+# vim: ft=yaml.ansible

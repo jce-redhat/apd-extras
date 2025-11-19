@@ -1,0 +1,36 @@
+---
+- name: Check that a web URL is available
+  hosts: localhost
+  sources:
+    - name: Check web URL
+      ansible.eda.url_check:
+        urls:
+          - '{{ web_server_url | default("https://www.redhat.com/") }}'
+        delay: 10
+        verify_ssl: '{{ web_server_verify_ssl | default(true) }}'
+
+  rules:
+    - name: Display debug info if status is not up
+      condition: 
+        any:
+          - event.url_check.status != "up"
+          - event.url_check.status_code != 200
+      action:
+        debug:
+      when: web_server_debug | default(false)
+
+    #- name: Restart web server
+    #  condition: 
+    #    any:
+    #      - event.url_check.status != "up"
+    #      - event.url_check.status_code != 200
+    #  action:
+    #    run_job_template:
+    #      name: Linux | Restart web server
+    #      organization: Ansible Product Demos (APD)
+    #      job_args:
+    #        extra_vars:
+    #          web_server_service_name: '{{ web_server_service_name | default("httpd") }}'
+
+...
+
