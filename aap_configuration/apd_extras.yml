@@ -1,4 +1,15 @@
 ---
+aap_user_accounts:
+  - username: apd-admin
+    email: apd-admin@example.com
+    password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
+
+gateway_role_user_assignments:
+  - user: apd-admin
+    role_definition: Organization Admin
+    object_ids:
+      - Ansible Product Demos (APD)
+
 eda_credentials:
   - name: AAP Credential
     description: AAP credential for EDA projects
