@@ -1,15 +1,4 @@
 ---
-aap_user_accounts:
-  - username: apd-admin
-    email: apd-admin@example.com
-    password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
-
-gateway_role_user_assignments:
-  - user: apd-admin
-    role_definition: Organization Admin
-    object_ids:
-      - Ansible Product Demos (APD)
-
 eda_credentials:
   - name: AAP Credential
     description: AAP credential for EDA projects
@@ -17,12 +6,11 @@ eda_credentials:
     credential_type: Red Hat Ansible Automation Platform
     organization: Ansible Product Demos (APD)
     inputs:
-      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.com") }}'
+      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}'
       username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
       password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
       oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
       verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
-      request_timeout: '{{ lookup("env","AAP_REQUEST_TIMEOUT") | default(omit) }}'
 
 eda_projects:
   - name: APD Extras

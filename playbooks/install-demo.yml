@@ -1,0 +1,36 @@
+---
+- name: Install APD extra demo
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    demo: ''
+    session_cookie_age: 3600
+
+  tasks:
+    - name: Ensure demo name is set
+      ansible.builtin.assert:
+        that:
+          - demo is not none and demo | length > 0
+        fail_msg: The 'demo' variable must be set
+
+    - name: Determine project root directory from playbook_dir variable
+      # noqa no-changed-when
+      ansible.builtin.command:
+        cmd: git rev-parse --show-toplevel
+        chdir: '{{ playbook_dir }}'
+      register: _repo_root
+
+    - name: Include "{{ demo }}" demo variables
+      ansible.builtin.include_vars:
+        file: '{{ _repo_root.stdout }}/demos/{{ demo }}/setup.yml'
+
+    - name: Run aap_configuration dispatcher
+      ansible.builtin.include_role:
+        name: infra.aap_configuration.dispatch
+      vars:
+        gateway_settings:
+          SESSION_COOKIE_AGE: '{{ session_cookie_age }}'
+
+...
+# vim: ft=yaml.ansible
