@@ -1,0 +1,64 @@
+---
+controller_templates:
+  - name: Cloud | AWS | Display available Infoblox AMIs
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/infoblox/display-infoblox-amis.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: vnios_aws_region
+          required: true
+          type: multiplechoice
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: Infoblox AMI name filter
+          variable: vnios_ami_name_filter
+          required: true
+          type: text
+          default: Infoblox *
+
+  - name: Cloud | AWS | Create Infoblox instance
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/infoblox/deploy-infoblox-in-aws.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: vnios_aws_region
+          required: true
+          type: multiplechoice
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS keypair name
+          description: Existing key to attach to the Infoblox instance
+          variable: vnios_keypair_name
+          required: true
+          type: text
+          default: aws-test-key
+        - question_name: Infoblox AMI name filter
+          variable: vnios_ami_name_filter
+          required: true
+          type: text
+          default: Infoblox NIOS 9.0.7-*
+
+...
+# vim: ft=yaml.ansible
