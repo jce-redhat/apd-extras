@@ -1,0 +1,27 @@
+---
+- name: Create rulebook activation for EDA check-url demo
+  hosts: localhost
+  gather_facts: false
+
+
+  tasks:
+    - name: Create rulebook activation
+      ansible.eda.rulebook_activation:
+        name: Check web server URL
+        description: Check availability of a URL, and restart the web server if needed
+        state: enabled
+        organization: Ansible Product Demos (APD)
+        decision_environment: Default Decision Environment
+        project: APD Extras
+        rulebook: check-url.yml
+        eda_credentials:
+          - AAP Credential for EDA
+        extra_vars:
+          web_server_url: '{{ "http://" + hostvars["webserver-eda"].public_dns_name + "/" }}'
+          web_server_service_name: '{{ web_server_service_name | default("httpd") }}'
+          web_server_inventory_hostname: webserver-eda
+          web_server_verify_ssl: false
+          web_server_debug: true
+
+...
+# vim: ft=yaml.ansible

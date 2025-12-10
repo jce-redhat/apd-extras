@@ -1,0 +1,60 @@
+---
+- name: Install web server on RHEL
+  hosts: '{{ target_hosts | default(omit) }}'
+  become: true
+
+  vars:
+    _web_server_package: '{{ web_server_package | default("httpd") }}'
+
+  tasks:
+    - name: Check that web server package is supported
+      ansible.builtin.assert:
+        that:
+          - _web_server_package in ['httpd','nginx']
+        fail_msg: "'web_server_package' variable must be one of 'httpd' or 'nginx'"
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Enable firewall web services
+      ansible.posix.firewalld:
+        service: '{{ item }}'
+        state: enabled
+        immediate: true
+        permanent: true
+      loop:
+        - http
+        - https
+      when:
+        - "'firewalld.service' in ansible_facts.services"
+        - ansible_facts.services["firewalld.service"].state == "running"
+
+    - name: Install web server software
+      ansible.builtin.dnf:
+        name: '{{ _web_server_package }}'
+        state: present
+      notify: Restart web server
+
+    # Ensure an index.html exists so the web server doesn't return a 403,
+    # which the check_url plugin interprets as the service being down
+    - name: Create web server index page
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf.d/welcome.conf
+        regexp: '^Alias /index.html '
+        line: Alias /index.html /usr/share/httpd/noindex/index.html
+        state: present
+      notify: Restart web server
+
+    - name: Display web server URL
+      ansible.builtin.debug:
+        msg: "Web server available at http://{{ public_dns_name | default(inventory_hostname) }}/"
+
+  handlers:
+    - name: Restart web server
+      ansible.builtin.service:
+        name: '{{ _web_server_package }}'
+        state: restarted
+        enabled: true
+
+...
+# vim: ft=yaml.ansible

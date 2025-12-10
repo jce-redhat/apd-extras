@@ -4,6 +4,8 @@
   gather_facts: false
 
   vars:
+    apd_extras_git_repo: https://github.com/jce-redhat/apd-extras.git
+    apd_extras_git_repo_branch: main
     demo: ''
     session_cookie_age: 3600
 
@@ -31,6 +33,14 @@
       vars:
         gateway_settings:
           SESSION_COOKIE_AGE: '{{ session_cookie_age }}'
+        controller_projects:
+          - name: APD Extras
+            organization: Ansible Product Demos (APD)
+            scm_type: git
+            scm_url: '{{ apd_extras_git_repo }}'
+            scm_branch: '{{ apd_extras_git_repo_branch }}'
+            default_environment: Product Demos EE
+            wait: true
 
 ...
 # vim: ft=yaml.ansible

@@ -1,12 +1,146 @@
 ---
+controller_templates:
+  - name: EDA | Create check-url rulebook activation
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AAP Credential
+    project: APD Extras
+    playbook: demos/eda_simple/check-url-rulebook-activation.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: URL to monitor
+          variable: web_server_url
+          required: true
+          type: text
+          default: https://www.redhat.com/
+        - question_name: Web server inventory name
+          description: Host in the inventory that runs the web server
+          variable: web_server_inventory_hostname
+          required: true
+          type: text
+        - question_name: Web server service name
+          variable: web_server_service_name
+          required: true
+          type: multiplechoice
+          choices:
+            - httpd
+            - nginx
+          default: httpd
+        - question_name: Enable rulebook debug
+          variable: web_server_debug
+          required: true
+          type: multiplechoice
+          choices:
+            - "true"
+            - "false"
+          default: "false"
+  - name: RHEL | Install web server software
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    project: APD Extras
+    playbook: demos/eda_simple/install-web-server.yml
+    credentials:
+      - APD Machine Credential
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Web server name or pattern
+          variable: target_hosts
+          type: text
+          required: true
+        - question_name: Web server package
+          variable: web_server_package
+          type: multiplechoice
+          choices:
+            - httpd
+            - nginx
+          default: httpd
+          required: true
+
+controller_workflows:
+  - name: Deploy EDA-monitored web server
+    description: Deploy a web server and monitor the server URL with EDA
+    organization: Ansible Product Demos (APD)
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          type: multiplechoice
+          variable: create_vm_aws_region
+          required: true
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS resource owner
+          type: text
+          variable: create_vm_aws_owner_tag
+          required: true
+        - question_name: AWS keypair public key content
+          type: textarea
+          variable: aws_public_key
+          required: true
+    simplified_workflow_nodes:
+      - identifier: Create Keypair
+        unified_job_template: Cloud | AWS | Create Keypair
+        success_nodes:
+          - Create web server instance
+        failure_nodes:
+          - Ticket - Keypair Failed
+      - identifier: Create VPC
+        unified_job_template: Cloud | AWS | Create VPC
+        success_nodes:
+          - Create web server instance
+        failure_nodes:
+          - Ticket - VPC Failed
+      - identifier: Ticket - Keypair Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS keypair
+      - identifier: Create web server instance
+        unified_job_template: Cloud | AWS | Create VM
+        all_parents_must_converge: true
+        extra_data:
+          create_vm_vm_name: webserver-eda
+          vm_blueprint: rhel9
+        success_nodes:
+          - Inventory Sync
+      - identifier: Inventory Sync
+        unified_job_template: AWS Inventory
+        success_nodes:
+          - Install web server software
+      - identifier: Install web server software
+        unified_job_template: RHEL | Install web server software
+        extra_data:
+          target_hosts: webserver-eda
+          web_server_package: httpd
+        success_nodes:
+          - Create EDA check_url rulebook activation
+      - identifier: Create EDA check_url rulebook activation
+        unified_job_template: EDA | Create check-url rulebook activation
+      - identifier: Ticket - VPC Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS VPC
+
 eda_credentials:
-  - name: AAP Credential
-    description: AAP credential for EDA projects
+  - name: AAP Credential for EDA
+    description: Credential allowing rulebook activations to connect to the automation controller
     state: present
     credential_type: Red Hat Ansible Automation Platform
     organization: Ansible Product Demos (APD)
     inputs:
-      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}'
+      # Note: API path required in AAP 2.5+ for AAP credential used by EDA
+      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}/api/controller'
       username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
       password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
       oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
@@ -16,19 +150,8 @@ eda_projects:
   - name: APD Extras
     description: Additional AAP resources for use with Ansible Product Demos
     state: present
-    url: https://github.com/jce-redhat/apd-extras.git
+    scm_url: https://github.com/jce-redhat/apd-extras.git
+    scm_branch: '{{ apd_extras_git_repo_branch | default("main") }}'
     organization: Ansible Product Demos (APD)
-
-eda_rulebook_activations:
-  - name: Check web server URL
-    description: Check availability of a URL, and restart the web server if needed
-    state: present
-    enabled: false
-    organization: Ansible Product Demos (APD)
-    decision_environment: Default Decision Environment
-    project: APD Extras
-    rulebook: check-url.yml
-    extra_vars:
-      web_server_debug: true
 
 ...
