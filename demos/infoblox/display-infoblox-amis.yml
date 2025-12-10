@@ -21,7 +21,7 @@
 
     - name: Display all AMI info
       ansible.builtin.debug:
-        var: _ami_info
+        var: _ami_info.images | map(attribute="name")
 
 ...
 # vim: ft=yaml.ansible
