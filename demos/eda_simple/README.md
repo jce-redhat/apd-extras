@@ -4,7 +4,13 @@ This is a simple Event Driven Ansible (EDA) demo that creates a web server in AW
 
 ## APD prerequisites
 
-Run the "APD | Multi-demo setup" job template and choose the "cloud" and "linux" options
+Run the "APD | Multi-demo setup" job template and choose the "cloud" and "linux" categories in order to create the required job templates:
+
+* Cloud | AWS | Create Keypair
+* Cloud | AWS | Create VPC
+* Cloud | AWS | Create VM
+* LINUX | Stop Service
+* LINUX | Start Service
 
 ## Demo workflow job template
 
@@ -13,11 +19,11 @@ The "Deploy EDA-monitored web server" workflow automates the following actions:
 *  Creates an EC2 VPC and key pair using survey input for the region, public key content, and resource owner tag.
 *  Creates an EC2 web server instance named "webserver-eda".
 *  Installs the "httpd" package on the web server instance and starts the service.
-*  Creates a rulebook activation using the check-url.yml rulebook that monitors the URL associated with the new web server instance.  The `public_dns_name` variable set by the AWS dynamic inventory script used for the URL hostname.
+*  Creates a rulebook activation using the check-url.yml rulebook that monitors the URL associated with the new web server instance.  The `public_dns_name` variable set by the AWS dynamic inventory script is used for the URL hostname.
 
-These resources are then used to demonstrate the rulebook activation which is monitoring the web server URL.
+These resources are then used to demonstrate the rulebook activation that is monitoring the web server URL.
 
-## Demo steps
+## Giving the demo
 1. In AAP, display the "Deploy EDA-monitored web server" workflow job template and walk through the individual steps.  If desired, click on the "Hosts" and "Rulebook Activations" tabs to show that the resources which will be created by the workflow do not exist yet.
 
 2. Run the "Deploy EDA-monitored web server" workflow job template.  Explain that the survey answers will be used by the AWS-related steps in the workflow.  Choose one of the AWS regions.  For the AWS resource owner, any arbitrary name will suffice.  The AWS key pair public key content must be the SSH public key that matches the private key used by the "APD Machine Credential" credential.  If using the RHDP catalog item for the demo, use the public key associated with the RHDP-provided bastion host.
