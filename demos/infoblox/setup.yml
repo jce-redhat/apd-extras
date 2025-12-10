@@ -1,0 +1,238 @@
+---
+controller_credential_types:
+  - name: Infoblox
+    description: Credentials for an Infoblox appliance
+    kind: cloud
+    inputs:
+      fields:
+        - id: host
+          type: string
+          label: Infoblox host name
+          help_text: The FQDN or IP address of the Infoblox appliance
+        - id: username
+          type: string
+          label: Infoblox user
+          help_text: User used for authentication to the Infoblox appliance
+        - id: password
+          type: string
+          label: Infoblox password
+          help_text: Password used for authentication to the Infoblox appliance
+          secret: true
+        - id: verify_ssl
+          type: boolean
+          label: Verify SSL connection
+      required:
+        - host
+        - username
+        - password
+    injectors:
+      env:
+        INFOBLOX_HOST: !unsafe '{{ host }}'
+        INFOBLOX_USERNAME: !unsafe '{{ username }}'
+        INFOBLOX_PASSWORD: !unsafe '{{ password }}'
+        INFOBLOX_SSL_VERIFY: !unsafe '{{ verify_ssl }}'
+
+controller_credentials:
+  - name: Infoblox
+    credential_type: Infoblox
+    organization: Ansible Product Demos (APD)
+    update_secrets: false
+    state: exists
+    inputs:
+      host: '{{ lookup("env","INFOBLOX_HOST") | default("example.invalid", true) }}'
+      username: '{{ lookup("env","INFOBLOX_USERNAME") | default("admin", true) }}'
+      password: '{{ lookup("env","INFOBLOX_PASSWORD") | default(vault_infoblox_password, true) }}'
+      verify_ssl: '{{ lookup("env","INFOBLOX_SSL_VERIFY") }}'
+
+# TODO remove this once the specified tag is promoted to latest
+controller_execution_environments:
+  - name: Product Demos EE
+    image: quay.io/ansible-product-demos/apd-ee-25:20251216
+
+controller_templates:
+  - name: Infoblox | AWS | Display available Infoblox AMIs
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/infoblox/display-infoblox-amis.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: vnios_aws_region
+          required: true
+          type: multiplechoice
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: Infoblox AMI name filter
+          variable: vnios_ami_name_filter
+          required: true
+          type: text
+          default: Infoblox *
+
+  - name: Infoblox | AWS | Create Infoblox instance
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+      - Infoblox
+    project: APD Extras
+    playbook: demos/infoblox/deploy-infoblox-in-aws.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: vnios_aws_region
+          required: true
+          type: multiplechoice
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS VPC name
+          description: Existing VPC where the Infoblox security group will be created
+          variable: vnios_vpc_name
+          required: true
+          type: text
+          default: aws-test-vpc
+        - question_name: AWS subnet name
+          description: Existing subnet where the Infoblox instance will be deployed
+          variable: vnios_subnet_name
+          required: true
+          type: text
+          default: aws-test-subnet
+        - question_name: AWS keypair name
+          description: Existing key to attach to the Infoblox instance
+          variable: vnios_keypair_name
+          required: true
+          type: text
+          default: aws-test-key
+        - question_name: Infoblox AMI name filter
+          variable: vnios_ami_name_filter
+          required: true
+          type: text
+          default: Infoblox NIOS 9.0.7-*
+        - question_name: Infoblox instance name
+          variable: vnios_instance_name
+          required: false
+          type: text
+          default: apd-infoblox
+
+  - name: Infoblox | AAP | Update Infoblox credential
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AAP Credential
+      - AWS
+    project: APD Extras
+    playbook: demos/infoblox/update-infoblox-credential.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Infoblox instance name
+          variable: vnios_instance_name
+          required: true
+          type: text
+          default: apd-infoblox
+
+  - name: Infoblox | Create DNS zones and records
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - Infoblox
+    project: APD Extras
+    playbook: demos/infoblox/create-infoblox-records.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Forward zone name
+          variable: forward_zone
+          required: true
+          type: text
+          default: apd.example.com
+        - question_name: Reverse zone CIDR
+          variable: reverse_zone_cidr
+          required: true
+          type: text
+          default: 10.1.0.0/24
+
+controller_workflows:
+  - name: Deploy Infoblox instance in AWS
+    description: Deploy an Infoblox virtual appliance in AWS
+    organization: Ansible Product Demos (APD)
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          type: multiplechoice
+          variable: create_vm_aws_region
+          required: true
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS resource owner
+          type: text
+          variable: create_vm_aws_owner_tag
+          required: true
+        - question_name: AWS keypair public key content
+          type: textarea
+          variable: aws_public_key
+          required: true
+        - question_name: Infoblox instance name
+          type: text
+          variable: vnios_instance_name
+          required: true
+          default: apd-infoblox
+    simplified_workflow_nodes:
+      - identifier: Create Keypair
+        unified_job_template: Cloud | AWS | Create Keypair
+        success_nodes:
+          - Create Infoblox instance
+        failure_nodes:
+          - Ticket - Keypair Failed
+      - identifier: Create VPC
+        unified_job_template: Cloud | AWS | Create VPC
+        success_nodes:
+          - Create Infoblox instance
+        failure_nodes:
+          - Ticket - VPC Failed
+      - identifier: Ticket - Keypair Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS keypair
+      - identifier: Create Infoblox instance
+        unified_job_template: Infoblox | AWS | Create Infoblox instance
+        all_parents_must_converge: true
+        success_nodes:
+          - Inventory Sync
+      - identifier: Inventory Sync
+        unified_job_template: AWS Inventory
+        success_nodes:
+          - Update Infoblox credential
+      - identifier: Update Infoblox credential
+        unified_job_template: Infoblox | AAP | Update Infoblox credential
+      - identifier: Ticket - VPC Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS VPC
+
+...
+# vim: ft=yaml.ansible

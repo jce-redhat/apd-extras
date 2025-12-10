@@ -1,0 +1,70 @@
+---
+- name: Create example records in Infoblox
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _forward_zone: '{{ forward_zone | default("apd.example.com") }}'
+    _reverse_zone_cidr: '{{ reverse_zone_cidr | default("10.1.0.0/24") }}'
+
+    # provider information pulled from the Infoblox credential in AAP
+    nios_provider:
+      host: "{{ lookup('env', 'INFOBLOX_HOST') }}"
+      username: "{{ lookup('env', 'INFOBLOX_USERNAME') }}"
+      password: "{{ lookup('env', 'INFOBLOX_PASSWORD') }}"
+      validate_certs: "{{ lookup('env', 'INFOBLOX_SSL_VERIFY') | bool }}"
+
+  tasks:
+    - name: Configure forward DNS zone
+      infoblox.nios_modules.nios_zone:
+        name: "{{ _forward_zone }}"
+        extattrs:
+          Site: Example site
+        comment: Managed by Ansible, do not modify manually
+        state: present
+        provider: "{{ nios_provider }}"
+
+    - name: Configure CIDR-based reverse zone
+      infoblox.nios_modules.nios_zone:
+        name: "{{ _reverse_zone_cidr }}"
+        zone_format: IPV4
+        comment: Managed by Ansible, do not modify manually
+        state: present
+        provider: "{{ nios_provider }}"
+
+    - name: Configure example A records
+      infoblox.nios_modules.nios_a_record:
+        name: host{{ item }}.{{ _forward_zone }}
+        ipv4addr: "{{ _reverse_zone_cidr | ansible.utils.nthhost(item + 3) }}"
+        comment: Managed by Ansible, do not modify manually
+        state: present
+        provider: "{{ nios_provider }}"
+      loop:
+        - 1
+        - 2
+
+    - name: Configure example PTR records
+      infoblox.nios_modules.nios_ptr_record:
+        ipv4addr: "{{ _reverse_zone_cidr | ansible.utils.nthhost(item + 3) }}"
+        ptrdname: host{{ item }}.{{ _forward_zone }}
+        comment: Managed by Ansible, do not modify manually
+        state: present
+        provider: "{{ nios_provider }}"
+      loop:
+        - 1
+        - 2
+
+    - name: Configure example CNAME record
+      infoblox.nios_modules.nios_cname_record:
+        name: '{{ item.name }}'
+        canonical: '{{ item.canonical }}'
+        comment: Managed by Ansible, do not modify manually
+        state: present
+        provider: "{{ nios_provider }}"
+      loop:
+        - name: database.{{ _forward_zone }}
+          canonical: host1.{{ _forward_zone }}
+        - name: webserver.{{ _forward_zone }}
+          canonical: host2.{{ _forward_zone }}
+
+...

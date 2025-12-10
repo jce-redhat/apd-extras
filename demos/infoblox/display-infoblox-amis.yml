@@ -1,0 +1,27 @@
+---
+- name: Display Infoblox AMIs in the AWS Marketplace
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    vnios_aws_region: us-west-2
+    vnios_ami_owner_alias: aws-marketplace
+    vnios_ami_name_filter: "Infoblox *"
+    vnios_ami_architecture: x86_64
+
+  tasks:
+    - name: Find Infoblox AMIs
+      amazon.aws.ec2_ami_info:
+        region: '{{ vnios_aws_region }}'
+        owners: '{{ vnios_ami_owner_alias }}'
+        filters:
+          name: '{{ vnios_ami_name_filter }}'
+          architecture: '{{ vnios_ami_architecture }}'
+      register: _ami_info
+
+    - name: Display all AMI info
+      ansible.builtin.debug:
+        var: _ami_info.images | map(attribute="name")
+
+...
+# vim: ft=yaml.ansible

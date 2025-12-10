@@ -1,0 +1,157 @@
+---
+- name: Deploy Infoblox virtual device in AWS
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # set defaults if survey extra_vars are not available
+    _aws_region: '{{ vnios_aws_region | default(create_vm_aws_region) | default("us-west-2") }}'
+    _aws_vpc: '{{ vnios_aws_vpc | default("aws-test-vpc") }}'
+    _aws_subnet: '{{ vnios_aws_subnet | default("aws-test-subnet") }}'
+    _ami_owner_alias: aws-marketplace
+    _ami_name_filter: '{{ vnios_ami_name_filter | default("Infoblox NIOS 9.0.7-*") }}'
+    _ami_architecture: x86_64
+    _sg_name: Infoblox vNIOS
+    _instance_name: '{{ vnios_instance_name | default("apd-infoblox") }}'
+    _instance_type: '{{ vnios_instance_type | default("m5.large") }}'
+    _instance_owner: '{{ vnios_instance_owner | default(create_vm_aws_owner_tag) | default("Ansible Product Demos") }}'
+    _keypair_name: '{{ vnios_keypair_name | default("aws-test-key") }}'
+
+  tasks:
+    - name: Ensure initial Infoblox password variable is set
+      ansible.builtin.assert:
+        that:
+          - 'lookup("env", "INFOBLOX_PASSWORD") | length > 0'
+        fail_msg: >
+          'INFOBLOX_PASSWORD' variable must be set, either as an environment
+          variable or in an attached AAP credential
+
+    - name: Retrieve VPC info
+      amazon.aws.ec2_vpc_net_info:
+        region: '{{ _aws_region }}'
+        filters:
+          'tag:Name': '{{ _aws_vpc }}'
+      register: _vpc_info
+
+    - name: Set VPC ID fact
+      ansible.builtin.set_fact:
+        _vpc_id: '{{ _vpc_info.vpcs[0].id }}'
+
+    - name: Retrieve VPC subnet info
+      amazon.aws.ec2_vpc_subnet_info:
+        region: '{{ _aws_region }}'
+        filters:
+          'tag:Name': '{{ _aws_subnet }}'
+      register: _subnet_info
+
+    - name: Set subnet ID fact
+      ansible.builtin.set_fact:
+        _subnet_id: '{{ _subnet_info.subnets[0].id }}'
+
+    - name: Find Infoblox AMIs
+      amazon.aws.ec2_ami_info:
+        region: '{{ _aws_region }}'
+        owners: '{{ _ami_owner_alias }}'
+        filters:
+          name: '{{ _ami_name_filter }}'
+          architecture: '{{ _ami_architecture }}'
+      register: _ami_info
+
+    - name: Get most recent AMI ID
+      ansible.builtin.set_fact:
+        _ami_id: >-
+          {{ _ami_info.images
+             | sort(attribute="creation_date")
+             | map(attribute="image_id")
+             | last
+          }}
+
+    - name: Create vNIOS security group
+      amazon.aws.ec2_security_group:
+        name: '{{ _sg_name }}'
+        state: present
+        vpc_id: '{{ _vpc_id }}'
+        region: '{{ _aws_region }}'
+        description: Security group rules for {{ _sg_name }}
+        rules:
+          - proto: tcp
+            ports:
+              - 22  # SSH
+              - 53  # DNS
+              - 443  # HTTPS
+              - 8787  # Infoblox API Proxy
+            cidr_ip: 0.0.0.0/0
+          - proto: udp
+            ports:
+              - 53  # DNS
+              - 1194  # NIOS Grid
+              - 2114  # NIOS Grid
+            cidr_ip: 0.0.0.0/0
+
+    - name: Create ENIs for Infoblox MGMT and LAN1 interfaces
+      amazon.aws.ec2_eni:
+        name: '{{ item }}'
+        region: "{{ _aws_region }}"
+        subnet_id: '{{ _subnet_id }}'
+        security_groups:
+          - "{{ _sg_name }}"
+        state: present
+      loop:
+        - MGMT
+        - LAN1
+      register: _eni
+
+    - name: Save ENI IDs
+      ansible.builtin.set_fact:
+        _eni_ids: '{{ _eni.results | map(attribute="interface") | map(attribute="id") }}'
+
+    - name: Create Infoblox instance
+      amazon.aws.ec2_instance:
+        name: "{{ _instance_name }}"
+        state: running
+        network:
+          assign_public_ip: false
+          delete_on_termination: true
+          interfaces: '{{ _eni_ids }}'
+        key_name: "{{ _keypair_name }}"
+        instance_type: "{{ _instance_type }}"
+        image_id: "{{ _ami_id }}"
+        region: "{{ _aws_region }}"
+        tags:
+          Name: "{{ _instance_name }}"
+          owner: "{{ _instance_owner }}"
+        vpc_subnet_id: "{{ _subnet_id }}"
+        # for temp_license information, see:
+        # https://docs.infoblox.com/space/nios90/220168268/set+temp_license
+        # https://docs.infoblox.com/space/DeploymentGuidevNIOSforOCI/1557430421/Cloud-Init
+        user_data: |
+          #infoblox-config
+          remote_console_enabled: yes
+          default_admin_password: {{ lookup("env", "INFOBLOX_PASSWORD") }}
+          temp_license: nios IB-V926 enterprise dns dhcp cloud
+      register: _vnios_instance_info
+
+    - name: Set delete-on-terminate for ENIs
+      amazon.aws.ec2_eni:
+        eni_id: '{{ item }}'
+        region: "{{ _aws_region }}"
+        delete_on_termination: true
+      loop: '{{ _eni_ids }}'
+
+    - name: Associate elastic IP with Infoblox instance LAN1 interface
+      amazon.aws.ec2_eip:
+        region: "{{ _aws_region }}"
+        device_id: '{{ _eni_ids | last }}'
+        in_vpc: true
+        tags:
+          Name: Infoblox vNIOS LAN1
+        reuse_existing_ip_allowed: true
+        state: present
+      register: _eip
+
+    - name: Display elastic IP
+      ansible.builtin.debug:
+        msg: Infoblox public IP address is {{ _eip.public_ip }}
+
+...
+# vim: ft=yaml.ansible
