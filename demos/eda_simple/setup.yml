@@ -30,14 +30,6 @@ controller_templates:
             - httpd
             - nginx
           default: httpd
-        - question_name: Enable rulebook debug
-          variable: web_server_debug
-          required: true
-          type: multiplechoice
-          choices:
-            - "true"
-            - "false"
-          default: "false"
   - name: RHEL | Install web server software
     job_type: run
     inventory: Ansible Product Demos Inventory

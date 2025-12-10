@@ -21,7 +21,6 @@
           web_server_service_name: '{{ web_server_service_name | default("httpd") }}'
           web_server_inventory_hostname: webserver-eda
           web_server_verify_ssl: false
-          web_server_debug: true
 
 ...
 # vim: ft=yaml.ansible
