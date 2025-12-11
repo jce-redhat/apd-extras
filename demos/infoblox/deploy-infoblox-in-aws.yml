@@ -6,6 +6,7 @@
   vars:
     # set defaults if survey extra_vars are not available
     vnios_aws_region: '{{ vnios_aws_region | default("us-west-2") }}'
+    vnios_aws_vpc: aws-test-vpc
     vnios_ami_owner_alias: aws-marketplace
     vnios_ami_name_filter: '{{ vnios_ami_name_filter | default("Infoblox NIOS 9.0.7-*") }}'
     vnios_ami_architecture: x86_64
