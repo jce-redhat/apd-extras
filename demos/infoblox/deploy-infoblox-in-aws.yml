@@ -16,7 +16,12 @@
     vnios_keypair_name: '{{ vnios_keypair_name | default("apd-instance-key") }}'
 
   tasks:
-    - name: Determine default subnet
+    - name: Set AWS subnet fact
+      ansible.builtin.set_fact:
+        _subnet_id: '{{ vnios_aws_subnet }}'
+      when: vnios_aws_subnet is defined
+
+    - name: Determine AWS default subnet
       when: vnios_aws_subnet is not defined
       block:
         - name: Get list of subnets in the default VPC

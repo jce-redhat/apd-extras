@@ -54,6 +54,12 @@ controller_templates:
           required: true
           type: text
           default: aws-test-key
+        - question_name: AWS subnet name
+          description: Existing subnet where the Infoblox instance will be deployed
+          variable: vnios_subnet_name
+          required: true
+          type: text
+          default: aws-test-subnet
         - question_name: Infoblox AMI name filter
           variable: vnios_ami_name_filter
           required: true
