@@ -6,7 +6,7 @@ This demo creates an Infoblox appliance instance in AWS and provides playbooks f
 
 ### Demo setup prerequisites
 
-Before running the `install-demo.yml` playbook to install this demo, set the `INFOBLOX_PASSWORD` variable to the password that you want for logging in to the new Infoblox instance as the admin user:
+Before running the `install-demo.yml` playbook to install this demo, set the `INFOBLOX_PASSWORD` environment variable to the password that you want for logging in to the new Infoblox instance as the admin user:
 
 ```
 export INFOBLOX_PASSWORD=<initial_admin_password>
