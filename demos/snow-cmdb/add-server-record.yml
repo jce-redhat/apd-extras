@@ -1,0 +1,59 @@
+---
+- name: Add a server record to the SNOW CMDB
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # override with survey variables
+    snow_server_fqdn: ''
+
+  tasks:
+    - name: Ensure that server FQDN is provided
+      ansible.builtin.assert:
+        that:
+          - '"." in snow_server_fqdn | default("")'
+          - 'not snow_server_fqdn | regex_search("\\s")'
+          - 'snow_server_fqdn.split(".") | length >= 3'
+        fail_msg: 'The variable snow_server_fqdn must be a valid FQDN'
+
+    - name: Check IP address validity
+      ansible.builtin.assert:
+        that:
+          - snow_server_ip | ansible.utils.ipaddr
+        fail_msg: 'The variable snow_server_ip must be set to a valid IP address'
+      when: snow_server_ip | default('') | length > 0
+
+    - name: Retrieve rack record if specified
+      servicenow.itsm.configuration_item_info:
+        sys_class_name: cmdb_ci_rack
+        name: '{{ snow_server_rack }}'
+      when: snow_server_rack | default('') | length > 0
+      register: _rack_info
+
+    - name: Create CMDB server record
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_server
+        name: '{{ snow_server_fqdn.split(".")[0] }}'
+        short_description: '{{ snow_server_description | default(omit) }}'
+        ip_address: '{{ snow_server_ip | default(omit) }}'
+        other:
+          fqdn: '{{ snow_server_fqdn }}'
+          dns_domain: '{{ snow_server_fqdn.split(".")[1:] | join(".") }}'
+          os: '{{ snow_server_os  | default(omit) }}'
+      register: _server
+
+    - name: Associate the server to the rack record
+      servicenow.itsm.configuration_item_relations:
+        name: 'Contains::Contained by'
+        parent_sys_id: '{{ _rack_info.records[0].sys_id }}'
+        parent_classname: cmdb_ci_rack
+        direction: outbound
+        targets:
+          - sys_id: '{{ _server.record.sys_id }}'
+            name: '{{ snow_server_fqdn.split(".")[0] }}'
+      when:
+        -  _server.record.sys_id is defined
+        -  _rack_info.records | default([]) | length > 0
+
+...
+# vim: ft=yaml.ansible

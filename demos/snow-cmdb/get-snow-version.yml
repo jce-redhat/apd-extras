@@ -1,0 +1,19 @@
+---
+- name: Get version from the ServiceNow API
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Get ServiceNow Version Info
+      servicenow.itsm.api_info:
+        resource: sys_properties
+        # Check the three most common version properties
+        sysparm_query: "nameINglide.buildname,glide.war,glide.product.version"
+      register: _version_info
+
+    - name: Display ServiceNow Version
+      ansible.builtin.debug:
+        msg: "{{ _version_info.record | map(attribute='value') | list }}"
+
+...
+# vim: ft=yaml.ansible

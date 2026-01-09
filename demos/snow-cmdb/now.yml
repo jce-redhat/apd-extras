@@ -1,0 +1,42 @@
+# ServiceNow dynamic inventory plugin configuration
+# https://console.redhat.com/ansible/automation-hub/repo/published/servicenow/itsm/content/inventory/now/
+---
+plugin: servicenow.itsm.now
+table: cmdb_ci_server
+
+# sysparm_query passes native ServiceNow queries directly through to the SNOW API,
+# which is useful for more complex queries using the native SNOW query mechanisms.
+# examples:
+#
+# filter on a specific label (tag) attached to server records
+# sysparm_query: "RLQUERYlabel_entry.table_key,>=1^label.name=APD SNOW Demo^ENDRLQUERY"
+# filter on record names that start with the string "apd-"
+# sysparm_query: nameSTARTSWITHapd-
+# filter on record FQDNs that end in a specific DNS domain
+sysparm_query: fqdnENDSWITHapd.example.com
+
+# columns in the CMDB table to query
+columns:
+  - name
+  - fqdn
+  - ip_address
+  - os
+
+# include asset relationship information
+enhanced: true
+enhanced_additional_columns:
+  - type.name
+  - parent.name
+  - child.name
+
+# create groups based on the OS field for the host
+groups:
+  os_linux: os in ('RHEL 9', 'RHEL 10', 'Linux Red Hat', 'Linux Fedora', 'Linux SuSE', 'Linux Oracle')
+  os_rhel: os in ('RHEL 9', 'RHEL 10', 'Linux Red Hat')
+  os_windows: os | regex_search('^Windows')
+
+compose:
+  # set the ansible_host variable for each inventory host to the CMDB fqdn
+  ansible_host: fqdn
+
+...

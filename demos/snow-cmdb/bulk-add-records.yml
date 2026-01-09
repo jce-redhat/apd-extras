@@ -1,0 +1,90 @@
+---
+- name: Add demo CMDB records to SNOW
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - vars/bulk-cmdb-records.yml
+
+  tasks:
+    - name: Create CMDB computer room records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_computer_room
+        name: '{{ item.name }}'
+        short_description: '{{ item.description | default(none) }}'
+        other:
+          floor_space: '{{ item.floor_space | default(none) }}'
+          floor_space_in_use: '{{ item.floor_space_in_use | default(none) }}'
+      loop: '{{ snow_computer_rooms }}'
+      loop_control:
+        label: "Creating computer room record for '{{ item.name }}'"
+      register: _computer_room
+
+    - name: Create CMDB rack records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_rack
+        name: '{{ item.name }}'
+        short_description: '{{ item.description | default(none) }}'
+        other:
+          manufacturer: '{{ item.manufacturer | default(none) }}'
+          rack_units: '{{ item.rack_units | default(none) }}'
+          power_consumption: '{{ item.power_consumption | default(none) }}'
+      loop: '{{ snow_racks }}'
+      loop_control:
+        label: "Creating rack record for '{{ item.name }}'"
+      register: _rack
+
+    - name: Create CMDB server records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_server
+        name: '{{ item.name }}'
+        short_description: '{{ item.description | default(none) }}'
+        ip_address: '{{ item.ip_address | default(none) }}'
+        other:
+          fqdn: '{{ [item.name, item.dns_domain | default(none)] | join(".") | lower }}'
+          dns_domain: '{{ item.dns_domain | default(none) }}'
+          os: '{{ item.os | default(none) }}'
+      loop: '{{ snow_servers }}'
+      loop_control:
+        label: "Creating server record for server '{{ item.name }}'"
+      register: _server
+
+      # SNOW CMDB assets relationships (servers in a rack, racks in a computer room, etc.)
+      # are made using the sys_id of the assets.  This task creates maps of the related
+      # asset sys_ids from their registered variables for this purpose.
+    - name: Map records to sys_id values
+      ansible.builtin.set_fact:
+        room_ids: "{{ _computer_room.results | map(attribute='record') | items2dict(key_name='name', value_name='sys_id') }}"
+        rack_ids: "{{ _rack.results | map(attribute='record') | items2dict(key_name='name', value_name='sys_id') }}"
+        server_ids: "{{ _server.results | map(attribute='record') | items2dict(key_name='name', value_name='sys_id') }}"
+
+    - name: Associate racks to computer rooms
+      servicenow.itsm.configuration_item_relations:
+        name: 'Contains::Contained by'
+        parent_sys_id: '{{ room_ids[item.computer_room] }}'
+        parent_classname: cmdb_ci_computer_room
+        direction: outbound
+        targets:
+          - sys_id: '{{ rack_ids[item.name] }}'
+            name: '{{ item.name }}'
+      when: item.computer_room in room_ids
+      loop: '{{ snow_racks }}'
+      loop_control:
+        label: 'Associating {{ item.name }} to {{ item.computer_room }}'
+
+    - name: Associate servers to racks
+      servicenow.itsm.configuration_item_relations:
+        name: 'Contains::Contained by'
+        parent_sys_id: '{{ rack_ids[item.rack] }}'
+        parent_classname: cmdb_ci_rack
+        direction: outbound
+        targets:
+          - sys_id: '{{ server_ids[item.name] }}'
+            name: '{{ item.name }}'
+      when: item.rack is defined and item.rack in rack_ids
+      loop: '{{ snow_servers }}'
+      loop_control:
+        label: 'Associating {{ item.name }} to {{ item.rack }}'
+
+...
+# vim: ft=yaml.ansible
