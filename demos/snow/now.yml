@@ -1,7 +1,17 @@
+# ServiceNow dynamic inventory plugin configuration
 ---
 plugin: servicenow.itsm.now
+columns:
+  - name
+  - sys_id
+  - asset_tag
+  - fqdn
+  - ip_address
+  - cpu_type
 keyed_groups:
   - key: os
     prefix: os
+compose:
+  ansible_host: fqdn
 
 ...
