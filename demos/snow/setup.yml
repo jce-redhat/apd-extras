@@ -1,0 +1,60 @@
+---
+controller_credential_types:
+  - name: ServiceNow User/Password
+    description: Username/password credential for a ServiceNow instance (non-OAuth)
+    kind: cloud
+    inputs:
+      fields:
+        - id: host
+          type: string
+          label: ServiceNow host name
+          help_text: The FQDN or IP address of the ServiceNow appliance
+        - id: username
+          type: string
+          label: ServiceNow user
+          help_text: User used for authentication to the ServiceNow appliance
+        - id: password
+          type: string
+          label: ServiceNow password
+          help_text: Password used for authentication to the ServiceNow appliance
+          secret: true
+      required:
+        - host
+        - username
+        - password
+    injectors:
+      env:
+        SN_HOST: !unsafe '{{ host }}'
+        SN_USERNAME: !unsafe '{{ username }}'
+        SN_PASSWORD: !unsafe '{{ password }}'
+
+controller_credentials:
+  - name: SNOW
+    credential_type: ServiceNow User/Password
+    organization: Ansible Product Demos (APD)
+    update_secrets: false
+    state: exists
+    inputs:
+      host: '{{ lookup("env","SN_HOST") | default("example.invalid", true) }}'
+      username: '{{ lookup("env","SN_USERNAME") | default("admin", true) }}'
+      password: '{{ lookup("env","SN_PASSWORD") }}'
+
+# TODO remove this once the specified tag is promoted to latest
+controller_execution_environments:
+  - name: Product Demos EE
+    image: quay.io/ansible-product-demos/apd-ee-25:20260108
+
+controller_inventory_sources:
+  - name: SNOW
+    description: Dynamic inventory pulled from ServiceNow
+    organization: Ansible Product Demos (APD)
+    inventory: Ansible Product Demos Inventory
+    credential: SNOW
+    overwrite: true
+    source_vars:
+      plugin: servicenow.itsm
+      keyed_groups:
+        - key: os
+          prefix: os
+
+...
