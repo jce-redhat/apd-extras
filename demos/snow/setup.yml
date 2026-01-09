@@ -46,15 +46,13 @@ controller_execution_environments:
 
 controller_inventory_sources:
   - name: SNOW
+    source: scm
+    source_project: APD Extras
+    source_path: demos/snow/now.yml
     description: Dynamic inventory pulled from ServiceNow
     organization: Ansible Product Demos (APD)
     inventory: Ansible Product Demos Inventory
     credential: SNOW
     overwrite: true
-    source_vars:
-      plugin: servicenow.itsm
-      keyed_groups:
-        - key: os
-          prefix: os
 
 ...

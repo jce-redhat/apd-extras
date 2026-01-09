@@ -1,0 +1,7 @@
+---
+plugin: servicenow.itsm
+keyed_groups:
+  - key: os
+    prefix: os
+
+...
