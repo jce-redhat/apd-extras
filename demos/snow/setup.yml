@@ -35,7 +35,7 @@ controller_credentials:
     update_secrets: false
     state: exists
     inputs:
-      host: '{{ lookup("env","SN_HOST") | default("example.invalid", true) }}'
+      host: '{{ lookup("env","SN_HOST") | default("https://example.invalid/", true) }}'
       username: '{{ lookup("env","SN_USERNAME") | default("admin", true) }}'
       password: '{{ lookup("env","SN_PASSWORD") }}'
 
