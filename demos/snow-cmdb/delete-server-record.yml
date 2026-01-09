@@ -1,0 +1,18 @@
+---
+- name: Delete a server record from the SNOW CMDB
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # override with survey variables
+    snow_server_fqdn: ''
+
+  tasks:
+    - name: Delete CMDB server record
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_server
+        name: '{{ snow_server_fqdn.split(".")[0] }}'
+        state: absent
+
+...
+# vim: ft=yaml.ansible

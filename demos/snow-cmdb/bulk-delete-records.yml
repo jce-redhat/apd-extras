@@ -1,0 +1,32 @@
+---
+- name: Delete demo CMDB records from SNOW
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - vars/bulk-cmdb-records.yml
+
+  tasks:
+    - name: Delete CMDB server records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_server
+        name: '{{ item.name }}'
+        state: absent
+      loop: '{{ snow_servers }}'
+
+    - name: Delete CMDB rack records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_rack
+        name: '{{ item.name }}'
+        state: absent
+      loop: '{{ snow_racks }}'
+
+    - name: Delete CMDB computer room records
+      servicenow.itsm.configuration_item:
+        sys_class_name: cmdb_ci_computer_room
+        name: '{{ item.name }}'
+        state: absent
+      loop: '{{ snow_computer_rooms }}'
+
+...
+# vim: ft=yaml.ansible

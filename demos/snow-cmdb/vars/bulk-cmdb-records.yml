@@ -1,0 +1,49 @@
+# variables for creating and deleting demo CMDB records
+---
+snow_computer_rooms:
+  - name: APD Site 1
+    description: East coast site
+  - name: APD Site 2
+    description: West coast site
+    floor_space: 250
+    floor_space_in_use: 180
+
+snow_racks:
+  - name: APD Site 1 Rack 1
+    computer_room: APD Site 1
+    rack_units: 42
+  - name: APD Site 1 Rack 2
+    computer_room: APD Site 1
+    rack_units: 42
+  - name: APD Site 2 Rack 1
+    computer_room: APD Site 2
+    rack_units: 22
+
+snow_servers:
+  - name: apd-sn-svr1
+    dns_domain: site1.apd.example.com
+    ip_address: 192.168.1.11
+    os: Linux Red Hat
+    rack: APD Site 1 Rack 1
+  - name: apd-sn-svr2
+    dns_domain: site1.apd.example.com
+    ip_address: 192.168.1.12
+    os: Linux Red Hat
+    rack: APD Site 1 Rack 1
+  - name: apd-sn-svr3
+    dns_domain: site2.apd.example.com
+    ip_address: 192.168.3.11
+    rack: APD Site 2 Rack 1
+    os: Windows
+  - name: apd-sn-svr4
+    dns_domain: site1.apd.example.com
+    ip_address: 192.168.1.12
+    rack: APD Site 1 Rack 2
+    os: Linux Fedora
+  - name: apd-sn-svr5
+    dns_domain: site2.apd.example.com
+    ip_address: 192.168.3.12
+    os: Windows
+    rack: APD Site 2 Rack 1
+
+...

@@ -6,7 +6,7 @@ ansible-navigator:
   execution-environment:
     container-engine: podman
     # TODO switch back to "latest" tag when this tag is promoted
-    image: quay.io/ansible-product-demos/apd-ee-25:20251216
+    image: quay.io/ansible-product-demos/apd-ee-25:20260108
     pull:
       policy: missing
     environment-variables:
@@ -20,6 +20,9 @@ ansible-navigator:
         - INFOBLOX_HOST
         - INFOBLOX_USERNAME
         - INFOBLOX_PASSWORD
+        - SN_HOST
+        - SN_USERNAME
+        - SN_PASSWORD
   logging:
     level: info
     append: false
