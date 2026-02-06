@@ -11,36 +11,42 @@
       servicenow.itsm.configuration_item:
         sys_class_name: cmdb_ci_computer_room
         name: '{{ item.name }}'
-        short_description: '{{ item.description | default(none) }}'
+        short_description: '{{ item.description | default("") }}'
         other:
-          floor_space: '{{ item.floor_space | default(none) }}'
-          floor_space_in_use: '{{ item.floor_space_in_use | default(none) }}'
+          floor_space: '{{ item.floor_space | default(omit) }}'
+          floor_space_in_use: '{{ item.floor_space_in_use | default(omit) }}'
       loop: '{{ snow_computer_rooms }}'
+      loop_control:
+        label: 'Creating the {{ item.name }} computer room record'
       register: _computer_room
 
     - name: Create CMDB rack records
       servicenow.itsm.configuration_item:
         sys_class_name: cmdb_ci_rack
         name: '{{ item.name }}'
-        short_description: '{{ item.description | default(none) }}'
+        short_description: '{{ item.description | default("") }}'
         other:
-          manufacturer: '{{ item.manufacturer | default(none) }}'
-          rack_units: '{{ item.rack_units | default(none) }}'
-          power_consumption: '{{ item.power_consumption | default(none) }}'
+          manufacturer: '{{ item.manufacturer | default(omit) }}'
+          rack_units: '{{ item.rack_units | default(omit) }}'
+          power_consumption: '{{ item.power_consumption | default(omit) }}'
       loop: '{{ snow_racks }}'
+      loop_control:
+        label: 'Creating the {{ item.name }} rack record'
       register: _rack
 
     - name: Create CMDB server records
       servicenow.itsm.configuration_item:
         sys_class_name: cmdb_ci_server
         name: '{{ item.name }}'
-        short_description: '{{ item.description | default(none) }}'
-        ip_address: '{{ item.ip_address | default(none) }}'
+        short_description: '{{ item.description | default("") }}'
+        ip_address: '{{ item.ip_address | default(omit) }}'
         other:
-          fqdn: '{{ [item.name, item.dns_domain | default(none)] | join(".") | lower }}'
-          dns_domain: '{{ item.dns_domain | default(none) }}'
-          os: '{{ item.os | default(none) }}'
+          fqdn: '{{ [item.name, item.dns_domain | default(omit)] | join(".") | lower }}'
+          dns_domain: '{{ item.dns_domain | default(omit) }}'
+          os: '{{ item.os | default(omit) }}'
       loop: '{{ snow_servers }}'
+      loop_control:
+        label: 'Creating the {{ item.name }} server record'
       register: _server
 
       # SNOW CMDB assets relationships (servers in a rack, racks in a computer room, etc.)
@@ -79,6 +85,19 @@
       when: item.rack is defined and item.rack in rack_ids
       loop_control:
         label: 'Associating {{ item.name }} to {{ item.rack }}'
+
+    - name: Attach "APD SNOW Demo" label to each server
+      servicenow.itsm.configuration_item:
+        sys_class_name: label_entry
+        data:
+          table: cmdb_ci_server
+          table_key: '{{ server_ids[item.name] }}'
+          label: 'APD SNOW Demo'
+          title: '{{ item.name }}'
+      loop: '{{ snow_servers }}'
+      when: item.name in server_ids
+      loop_control:
+        label: "Tagging {{ item.name }} with 'APD SNOW Demo'"
 
 ...
 # vim: ft=yaml.ansible

@@ -8,8 +8,12 @@ table: cmdb_ci_server
 # which is useful for more complex queries using the native SNOW query mechanisms.
 # examples:
 #
-# sysparm_query: nameSTARTSWITHapd-             # filter on record names that start with the string "apd-"
-sysparm_query: fqdnENDSWITHapd.example.com      # filter on record FQDNs that end in the specified domain
+# filter on record names that start with the string "apd-"
+# sysparm_query: nameSTARTSWITHapd-
+# filter on record FQDNs that end in a specific DNS domain
+# sysparm_query: fqdnENDSWITHapd.example.com
+# filter on a specific label (tag) attached to server records
+sysparm_query: "RLQUERYlabel_entry.table_key,>=1^label.name=APD SNOW Demo^ENDRLQUERY"
 
 # columns in the CMDB table to query
 # NOTE: undocumented, but using "columns:" doesn't seem to worked with the
@@ -30,7 +34,7 @@ enhanced_additional_columns:
 # create groups based on the OS field for the host
 groups:
   os_linux: os in ('RHEL 9', 'RHEL 10', 'Linux Red Hat', 'Linux Fedora', 'Linux SuSE', 'Linux Oracle')
-  os_rhel: os in ('RHEL 9', 'RHEL 10', 'Linux Red Hat')
+  os_rhel: os in ('RHEL 9', 'RHEL 10')
   os_windows: os | regex_search('^Windows')
 
 compose:
