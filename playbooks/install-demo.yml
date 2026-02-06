@@ -4,43 +4,48 @@
   gather_facts: false
 
   vars:
-    apd_extras_git_repo: https://github.com/jce-redhat/apd-extras.git
-    apd_extras_git_repo_branch: main
+    # override with survey input
     demo: ''
-    session_cookie_age: 3600
 
   tasks:
+    # Rather than maintain a list of available demos in a survey, get a list
+    # of available demo directories and ensure that the requested demo is in
+    # the list.  Depends on the fact that an ansible.cfg file exists at the
+    # root of the project directory.
+    - name: Set project root fact
+      ansible.builtin.set_fact:
+        _project_root: '{{ ansible_config_file | dirname }}'
+
+    - name: Get a list of demo directories
+      ansible.builtin.find:
+        paths: '{{ _project_root }}/demos/'
+        file_type: directory
+        recurse: false
+      register: _demo_dirs
+
+    - name: Create list of available demos
+      ansible.builtin.set_fact:
+        available_demos: '{{ _demo_dirs.files | map(attribute="path") | map("basename") | list }}'
+
     - name: Ensure demo name is set
       ansible.builtin.assert:
         that:
           - demo is not none and demo | length > 0
         fail_msg: The 'demo' variable must be set
 
-    - name: Determine project root directory from playbook_dir variable
-      # noqa no-changed-when
-      ansible.builtin.command:
-        cmd: git rev-parse --show-toplevel
-        chdir: '{{ playbook_dir }}'
-      register: _repo_root
+    - name: Ensure requested demo is available
+      ansible.builtin.assert:
+        that:
+          - demo in available_demos
+        fail_msg: The '{{ demo }}' demo is not available in this repository
 
-    - name: Include "{{ demo }}" demo variables
+    - name: Include '{{ demo }}' demo variables
       ansible.builtin.include_vars:
-        file: '{{ _repo_root.stdout }}/demos/{{ demo }}/setup.yml'
+        file: '{{ _project_root }}/demos/{{ demo }}/setup.yml'
 
     - name: Run aap_configuration dispatcher
       ansible.builtin.include_role:
         name: infra.aap_configuration.dispatch
-      vars:
-        gateway_settings:
-          SESSION_COOKIE_AGE: '{{ session_cookie_age }}'
-        controller_projects:
-          - name: APD Extras
-            organization: Ansible Product Demos (APD)
-            scm_type: git
-            scm_url: '{{ apd_extras_git_repo }}'
-            scm_branch: '{{ apd_extras_git_repo_branch }}'
-            default_environment: Product Demos EE
-            wait: true
 
 ...
 # vim: ft=yaml.ansible
