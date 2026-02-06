@@ -55,5 +55,14 @@
         -  _server.record.sys_id is defined
         -  _rack_info.records | default([]) | length > 0
 
+    - name: Attach "APD SNOW Demo" label to the server
+      servicenow.itsm.configuration_item:
+        sys_class_name: label_entry
+        data:
+          table: cmdb_ci_server
+          table_key: '{{ _server.record.sys_id }}'
+          label: 'APD SNOW Demo'
+          title: '{{ snow_server_fqdn.split(".")[0] }}'
+
 ...
 # vim: ft=yaml.ansible

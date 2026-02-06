@@ -67,8 +67,8 @@
         targets:
           - sys_id: '{{ rack_ids[item.name] }}'
             name: '{{ item.name }}'
-      loop: '{{ snow_racks }}'
       when: item.computer_room in room_ids
+      loop: '{{ snow_racks }}'
       loop_control:
         label: 'Associating {{ item.name }} to {{ item.computer_room }}'
 
@@ -81,8 +81,8 @@
         targets:
           - sys_id: '{{ server_ids[item.name] }}'
             name: '{{ item.name }}'
-      loop: '{{ snow_servers }}'
       when: item.rack is defined and item.rack in rack_ids
+      loop: '{{ snow_servers }}'
       loop_control:
         label: 'Associating {{ item.name }} to {{ item.rack }}'
 
@@ -94,8 +94,8 @@
           table_key: '{{ server_ids[item.name] }}'
           label: 'APD SNOW Demo'
           title: '{{ item.name }}'
-      loop: '{{ snow_servers }}'
       when: item.name in server_ids
+      loop: '{{ snow_servers }}'
       loop_control:
         label: "Tagging {{ item.name }} with 'APD SNOW Demo'"
 
