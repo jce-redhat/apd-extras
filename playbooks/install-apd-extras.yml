@@ -1,0 +1,45 @@
+---
+- name: Install APD extras
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    apd_extras_git_repo: https://github.com/jce-redhat/apd-extras.git
+    apd_extras_git_repo_branch: main
+    session_cookie_age: 3600
+
+  tasks:
+    - name: Install APD extras
+      ansible.builtin.include_role:
+        name: infra.aap_configuration.dispatch
+      vars:
+        gateway_settings:
+          SESSION_COOKIE_AGE: '{{ session_cookie_age }}'
+        controller_projects:
+          - name: APD Extras
+            organization: Ansible Product Demos (APD)
+            scm_type: git
+            scm_url: '{{ apd_extras_git_repo }}'
+            scm_branch: '{{ apd_extras_git_repo_branch }}'
+            default_environment: Product Demos EE
+            wait: true
+        controller_templates:
+          - name: APD Extras | Install extra demo
+            job_type: run
+            inventory: Ansible Product Demos Inventory
+            credentials:
+              - AAP Credential
+            project: APD Extras
+            playbook: playbooks/install-demo.yml
+            survey_enabled: true
+            survey:
+              name: ''
+              description: ''
+              spec:
+                - question_name: Name of extra demo
+                  variable: demo
+                  required: true
+                  type: text
+
+...
+# vim: ft=yaml.ansible
