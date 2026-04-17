@@ -1,0 +1,110 @@
+---
+- name: Install Splunk Enterprise on EC2 instance
+  hosts: "tag_Name_{{ splunk_instance_name | default('apd-splunk') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    splunk_download_url: '{{ splunk_download_url | default("") }}'
+    # Splunk installation defaults
+    splunk:
+      user: splunk
+      group: splunk
+      exec: /opt/splunk/bin/splunk
+      home: /opt/splunk
+      license_uri: null  # Use Splunk Free license
+      admin_password: '{{ lookup("env", "SPLUNK_ADMIN_PASSWORD") | default("changeme123") }}'
+      build_location: '{{ splunk_download_url if splunk_download_url else omit }}'
+      opt:
+        splunk_home_ownership_enforcement: false
+
+  pre_tasks:
+    - name: Ensure Splunk admin password is set
+      ansible.builtin.assert:
+        that:
+          - 'lookup("env", "SPLUNK_ADMIN_PASSWORD") | length > 0'
+        fail_msg: >
+          'SPLUNK_ADMIN_PASSWORD' variable must be set, either as an environment
+          variable or in an attached AAP credential
+
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - wget
+          - tar
+          - gzip
+        state: present
+
+    - name: Create Splunk user
+      ansible.builtin.user:
+        name: '{{ splunk.user }}'
+        group: '{{ splunk.group }}'
+        create_home: true
+        system: true
+        state: present
+
+  tasks:
+    - name: Download Splunk Enterprise
+      ansible.builtin.get_url:
+        url: '{{ splunk.build_location }}'
+        dest: /tmp/splunk.tgz
+        mode: '0644'
+      when: splunk.build_location is defined
+
+    - name: Create Splunk installation directory
+      ansible.builtin.file:
+        path: '{{ splunk.home }}'
+        state: directory
+        owner: '{{ splunk.user }}'
+        group: '{{ splunk.group }}'
+        mode: '0755'
+
+    - name: Extract Splunk tarball
+      ansible.builtin.unarchive:
+        src: /tmp/splunk.tgz
+        dest: /opt
+        remote_src: true
+        owner: '{{ splunk.user }}'
+        group: '{{ splunk.group }}'
+      when: splunk.build_location is defined
+
+    - name: Accept Splunk license and set admin password
+      ansible.builtin.command:
+        cmd: >
+          {{ splunk.exec }} start
+          --accept-license
+          --answer-yes
+          --no-prompt
+          --seed-passwd {{ splunk.admin_password }}
+        creates: '{{ splunk.home }}/etc/splunk-launch.conf'
+      become_user: '{{ splunk.user }}'
+
+    - name: Enable Splunk to start at boot
+      ansible.builtin.command:
+        cmd: '{{ splunk.exec }} enable boot-start -user {{ splunk.user }}'
+        creates: /etc/init.d/splunk
+      when: ansible_service_mgr != 'systemd'
+
+    - name: Enable Splunk systemd service
+      ansible.builtin.systemd:
+        name: Splunkd
+        enabled: true
+        daemon_reload: true
+      when: ansible_service_mgr == 'systemd'
+
+    - name: Ensure Splunk is running
+      ansible.builtin.service:
+        name: splunk
+        state: started
+
+  post_tasks:
+    - name: Display Splunk web URL
+      ansible.builtin.debug:
+        msg:
+          - "Splunk Enterprise installed successfully"
+          - "Splunk Web URL: http://{{ ansible_default_ipv4.address }}:8000"
+          - "Username: admin"
+          - "Password: {{ splunk.admin_password }}"
+
+...
+# vim: ft=yaml.ansible

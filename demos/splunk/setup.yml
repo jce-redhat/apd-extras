@@ -1,0 +1,213 @@
+---
+controller_credential_types:
+  - name: Splunk Admin
+    description: Credentials for Splunk Enterprise admin user
+    kind: cloud
+    inputs:
+      fields:
+        - id: admin_password
+          type: string
+          label: Splunk admin password
+          help_text: Password for the Splunk admin user
+          secret: true
+      required:
+        - admin_password
+    injectors:
+      env:
+        SPLUNK_ADMIN_PASSWORD: !unsafe '{{ admin_password }}'
+
+controller_credentials:
+  - name: Splunk Admin
+    credential_type: Splunk Admin
+    organization: Ansible Product Demos (APD)
+    update_secrets: false
+    state: exists
+    inputs:
+      admin_password: '{{ lookup("env","SPLUNK_ADMIN_PASSWORD") | default("changeme123", true) }}'
+
+controller_templates:
+  - name: Splunk | AWS | Deploy Splunk Enterprise EC2 instance
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/splunk/deploy-splunk-ec2.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: splunk_aws_region
+          required: true
+          type: multiplechoice
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS VPC name
+          description: Existing VPC where the Splunk security group will be created
+          variable: splunk_vpc_name
+          required: true
+          type: text
+          default: aws-test-vpc
+        - question_name: AWS subnet name
+          description: Existing subnet where the Splunk instance will be deployed
+          variable: splunk_subnet_name
+          required: true
+          type: text
+          default: aws-test-subnet
+        - question_name: AWS keypair name
+          description: Existing key to attach to the Splunk instance
+          variable: splunk_keypair_name
+          required: true
+          type: text
+          default: aws-test-key
+        - question_name: Splunk instance name
+          variable: splunk_instance_name
+          required: false
+          type: text
+          default: apd-splunk
+        - question_name: Splunk instance type
+          variable: splunk_instance_type
+          required: false
+          type: multiplechoice
+          choices:
+            - t3.medium
+            - t3.large
+            - t3.xlarge
+          default: t3.medium
+
+  - name: Splunk | Install Splunk Enterprise
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+      - Splunk Admin
+    project: APD Extras
+    playbook: demos/splunk/install-splunk.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Splunk instance name
+          variable: splunk_instance_name
+          required: true
+          type: text
+          default: apd-splunk
+        - question_name: Splunk download URL
+          description: URL to Splunk Enterprise .tgz file (or leave default for pre-staged S3)
+          variable: splunk_download_url
+          required: false
+          type: text
+          default: ''
+
+  - name: Splunk | Configure Splunk settings
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+      - Splunk Admin
+    project: APD Extras
+    playbook: demos/splunk/configure-splunk.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Splunk instance name
+          variable: splunk_instance_name
+          required: true
+          type: text
+          default: apd-splunk
+        - question_name: Enable Splunk Web (port 8000)
+          variable: enable_splunk_web
+          required: true
+          type: multiplechoice
+          choices:
+            - 'true'
+            - 'false'
+          default: 'true'
+
+controller_workflows:
+  - name: Deploy Splunk Enterprise in AWS
+    description: Deploy Splunk Enterprise on an EC2 instance
+    organization: Ansible Product Demos (APD)
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          type: multiplechoice
+          variable: create_vm_aws_region
+          required: true
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+        - question_name: AWS resource owner
+          type: text
+          variable: create_vm_aws_owner_tag
+          required: true
+        - question_name: AWS keypair public key content
+          type: textarea
+          variable: aws_public_key
+          required: true
+        - question_name: Splunk instance name
+          type: text
+          variable: splunk_instance_name
+          required: true
+          default: apd-splunk
+        - question_name: Splunk instance type
+          type: multiplechoice
+          variable: splunk_instance_type
+          required: true
+          choices:
+            - t3.medium
+            - t3.large
+            - t3.xlarge
+          default: t3.medium
+    simplified_workflow_nodes:
+      - identifier: Create Keypair
+        unified_job_template: Cloud | AWS | Create Keypair
+        success_nodes:
+          - Create Splunk instance
+        failure_nodes:
+          - Ticket - Keypair Failed
+      - identifier: Create VPC
+        unified_job_template: Cloud | AWS | Create VPC
+        success_nodes:
+          - Create Splunk instance
+        failure_nodes:
+          - Ticket - VPC Failed
+      - identifier: Ticket - Keypair Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS keypair
+      - identifier: Create Splunk instance
+        unified_job_template: Splunk | AWS | Deploy Splunk Enterprise EC2 instance
+        all_parents_must_converge: true
+        success_nodes:
+          - Inventory Sync
+      - identifier: Inventory Sync
+        unified_job_template: AWS Inventory
+        success_nodes:
+          - Install Splunk
+      - identifier: Install Splunk
+        unified_job_template: Splunk | Install Splunk Enterprise
+        success_nodes:
+          - Configure Splunk
+      - identifier: Configure Splunk
+        unified_job_template: Splunk | Configure Splunk settings
+      - identifier: Ticket - VPC Failed
+        unified_job_template: SUBMIT FEEDBACK
+        extra_data:
+          feedback: Failed to create AWS VPC
+
+...
+# vim: ft=yaml.ansible

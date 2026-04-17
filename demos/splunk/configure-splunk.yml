@@ -1,0 +1,84 @@
+---
+- name: Configure Splunk Enterprise settings
+  hosts: "tag_Name_{{ splunk_instance_name | default('apd-splunk') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    splunk_exec: /opt/splunk/bin/splunk
+    splunk_home: /opt/splunk
+    splunk_user: splunk
+    enable_splunk_web: '{{ enable_splunk_web | default("true") }}'
+    splunk_admin_password: '{{ lookup("env", "SPLUNK_ADMIN_PASSWORD") | default("changeme123") }}'
+
+  tasks:
+    - name: Ensure Splunk admin password is set
+      ansible.builtin.assert:
+        that:
+          - 'lookup("env", "SPLUNK_ADMIN_PASSWORD") | length > 0'
+        fail_msg: >
+          'SPLUNK_ADMIN_PASSWORD' variable must be set
+
+    - name: Configure Splunk Web enablement
+      ansible.builtin.lineinfile:
+        path: '{{ splunk_home }}/etc/system/local/web.conf'
+        regexp: '^startwebserver'
+        line: 'startwebserver = {{ "1" if enable_splunk_web | bool else "0" }}'
+        create: true
+        owner: '{{ splunk_user }}'
+        group: '{{ splunk_user }}'
+        mode: '0600'
+      notify: restart splunk
+
+    - name: Enable data receiving on port 9997
+      ansible.builtin.command:
+        cmd: >
+          {{ splunk_exec }} enable listen 9997
+          -auth admin:{{ splunk_admin_password }}
+      become_user: '{{ splunk_user }}'
+      changed_when: false
+      failed_when: false
+
+    - name: Configure Splunk to index main
+      ansible.builtin.copy:
+        dest: '{{ splunk_home }}/etc/system/local/inputs.conf'
+        content: |
+          [default]
+          host = {{ ansible_hostname }}
+
+          [splunktcp://9997]
+          disabled = false
+        owner: '{{ splunk_user }}'
+        group: '{{ splunk_user }}'
+        mode: '0600'
+      notify: restart splunk
+
+    - name: Set server name
+      ansible.builtin.lineinfile:
+        path: '{{ splunk_home }}/etc/system/local/server.conf'
+        regexp: '^serverName'
+        line: 'serverName = {{ ansible_hostname }}'
+        create: true
+        owner: '{{ splunk_user }}'
+        group: '{{ splunk_user }}'
+        mode: '0600'
+      notify: restart splunk
+
+  handlers:
+    - name: restart splunk
+      ansible.builtin.service:
+        name: splunk
+        state: restarted
+      become: true
+
+  post_tasks:
+    - name: Display configuration summary
+      ansible.builtin.debug:
+        msg:
+          - "Splunk configuration complete"
+          - "Splunk Web: {{ 'Enabled' if enable_splunk_web | bool else 'Disabled' }}"
+          - "Receiving port 9997: Enabled"
+          - "Server name: {{ ansible_hostname }}"
+
+...
+# vim: ft=yaml.ansible

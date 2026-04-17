@@ -1,0 +1,117 @@
+---
+- name: Deploy Splunk Enterprise EC2 instance in AWS
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # set defaults if survey extra_vars are not available
+    _aws_region: '{{ splunk_aws_region | default(create_vm_aws_region) | default("us-west-2") }}'
+    _aws_vpc: '{{ splunk_vpc_name | default("aws-test-vpc") }}'
+    _aws_subnet: '{{ splunk_subnet_name | default("aws-test-subnet") }}'
+    _instance_name: '{{ splunk_instance_name | default("apd-splunk") }}'
+    _instance_type: '{{ splunk_instance_type | default("t3.medium") }}'
+    _instance_owner: '{{ splunk_instance_owner | default(create_vm_aws_owner_tag) | default("Ansible Product Demos") }}'
+    _keypair_name: '{{ splunk_keypair_name | default("aws-test-key") }}'
+    _sg_name: Splunk Enterprise
+
+  tasks:
+    - name: Retrieve VPC info
+      amazon.aws.ec2_vpc_net_info:
+        region: '{{ _aws_region }}'
+        filters:
+          'tag:Name': '{{ _aws_vpc }}'
+      register: _vpc_info
+
+    - name: Set VPC ID fact
+      ansible.builtin.set_fact:
+        _vpc_id: '{{ _vpc_info.vpcs[0].id }}'
+
+    - name: Retrieve VPC subnet info
+      amazon.aws.ec2_vpc_subnet_info:
+        region: '{{ _aws_region }}'
+        filters:
+          'tag:Name': '{{ _aws_subnet }}'
+      register: _subnet_info
+
+    - name: Set subnet ID fact
+      ansible.builtin.set_fact:
+        _subnet_id: '{{ _subnet_info.subnets[0].id }}'
+
+    - name: Find RHEL 9 AMI
+      amazon.aws.ec2_ami_info:
+        region: '{{ _aws_region }}'
+        owners: '309956199498'  # Red Hat owner ID
+        filters:
+          name: 'RHEL-9.7*Hourly*'
+          state: available
+      register: _ami_info
+
+    - name: Get most recent AMI ID
+      ansible.builtin.set_fact:
+        _ami_id: >-
+          {{ _ami_info.images
+             | sort(attribute="creation_date")
+             | map(attribute="image_id")
+             | last
+          }}
+
+    - name: Create Splunk security group
+      amazon.aws.ec2_security_group:
+        name: '{{ _sg_name }}'
+        state: present
+        vpc_id: '{{ _vpc_id }}'
+        region: '{{ _aws_region }}'
+        description: Security group rules for {{ _sg_name }}
+        rules:
+          - proto: tcp
+            ports:
+              - 22    # SSH
+              - 8000  # Splunk Web
+              - 8089  # Splunkd management port
+              - 9997  # Splunk forwarder receiving
+            cidr_ip: 0.0.0.0/0
+
+    - name: Create Splunk EC2 instance
+      amazon.aws.ec2_instance:
+        name: "{{ _instance_name }}"
+        state: running
+        key_name: "{{ _keypair_name }}"
+        instance_type: "{{ _instance_type }}"
+        image_id: "{{ _ami_id }}"
+        region: "{{ _aws_region }}"
+        network:
+          assign_public_ip: true
+        security_groups:
+          - "{{ _sg_name }}"
+        tags:
+          Name: "{{ _instance_name }}"
+          owner: "{{ _instance_owner }}"
+          splunk_role: standalone
+        vpc_subnet_id: "{{ _subnet_id }}"
+        volumes:
+          - device_name: /dev/sda1
+            ebs:
+              volume_size: 120
+              volume_type: gp3
+              delete_on_termination: true
+        wait: true
+      register: _splunk_instance
+
+    - name: Wait for SSH to become available
+      ansible.builtin.wait_for:
+        host: '{{ _splunk_instance.instances[0].public_ip_address }}'
+        port: 22
+        delay: 30
+        timeout: 300
+        state: started
+
+    - name: Display instance information
+      ansible.builtin.debug:
+        msg:
+          - "Splunk instance created: {{ _instance_name }}"
+          - "Public IP: {{ _splunk_instance.instances[0].public_ip_address }}"
+          - "Instance ID: {{ _splunk_instance.instances[0].instance_id }}"
+          - "Run AWS Inventory sync before installing Splunk"
+
+...
+# vim: ft=yaml.ansible
