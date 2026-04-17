@@ -27,63 +27,31 @@
           'SPLUNK_ADMIN_PASSWORD' variable must be set, either as an environment
           variable or in an attached AAP credential
 
-    - name: Install required packages
-      ansible.builtin.package:
-        name:
-          - wget
-          - tar
-          - gzip
-        state: present
-
-    - name: Create Splunk group
-      ansible.builtin.group:
-        name: '{{ splunk.group }}'
-        system: true
-        state: present
-
-    - name: Create Splunk user
-      ansible.builtin.user:
-        name: '{{ splunk.user }}'
-        group: '{{ splunk.group }}'
-        create_home: true
-        system: true
-        state: present
-
   tasks:
-    - name: Download Splunk Enterprise from HTTPS
+    - name: Download Splunk Enterprise RPM from HTTPS
       ansible.builtin.get_url:
         url: '{{ splunk.build_location }}'
-        dest: /tmp/splunk.tgz
+        dest: /tmp/splunk.rpm
         mode: '0644'
       when:
         - splunk_download_url | length > 0
         - not splunk_download_url.startswith('s3://')
 
-    - name: Download Splunk Enterprise from S3
+    - name: Download Splunk Enterprise RPM from S3
       amazon.aws.s3_object:
         bucket: '{{ splunk_download_url | regex_replace("^s3://([^/]+)/.*", "\1") }}'
         object: '{{ splunk_download_url | regex_replace("^s3://[^/]+/", "") }}'
-        dest: /tmp/splunk.tgz
+        dest: /tmp/splunk.rpm
         mode: get
       when:
         - splunk_download_url | length > 0
         - splunk_download_url.startswith('s3://')
 
-    - name: Create Splunk installation directory
-      ansible.builtin.file:
-        path: '{{ splunk.home }}'
-        state: directory
-        owner: '{{ splunk.user }}'
-        group: '{{ splunk.group }}'
-        mode: '0755'
-
-    - name: Extract Splunk tarball
-      ansible.builtin.unarchive:
-        src: /tmp/splunk.tgz
-        dest: /opt
-        remote_src: true
-        owner: '{{ splunk.user }}'
-        group: '{{ splunk.group }}'
+    - name: Install Splunk Enterprise RPM
+      ansible.builtin.yum:
+        name: /tmp/splunk.rpm
+        state: present
+        disable_gpg_check: true
       when: splunk_download_url | length > 0
 
     - name: Accept Splunk license and set admin password
