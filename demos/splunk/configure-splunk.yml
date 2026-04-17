@@ -1,6 +1,6 @@
 ---
 - name: Configure Splunk Enterprise settings
-  hosts: "tag_Name_{{ splunk_instance_name | default('apd-splunk') }}"
+  hosts: "{{ splunk_instance_name | default('apd-splunk') }}"
   become: true
   gather_facts: true
 
