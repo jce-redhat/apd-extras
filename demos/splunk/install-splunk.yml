@@ -74,11 +74,15 @@
         creates: '{{ splunk.home }}/etc/splunk-launch.conf'
       become_user: '{{ splunk.user }}'
 
+    - name: Check if Splunk boot-start is already enabled
+      ansible.builtin.stat:
+        path: /etc/systemd/system/Splunkd.service
+      register: splunk_systemd_unit
+
     - name: Enable Splunk to start at boot
-      ansible.builtin.command:
-        cmd: '{{ splunk.exec }} enable boot-start -user {{ splunk.user }} --accept-license --answer-yes'
-      args:
-        creates: /etc/systemd/system/Splunkd.service
+      ansible.builtin.shell:
+        cmd: '{{ splunk.exec }} enable boot-start -user {{ splunk.user }} --accept-license --answer-yes < /dev/null'
+      when: not splunk_systemd_unit.stat.exists
 
     - name: Ensure Splunk is running
       ansible.builtin.command:
