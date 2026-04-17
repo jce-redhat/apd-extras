@@ -85,6 +85,7 @@ controller_templates:
     inventory: Ansible Product Demos Inventory
     credentials:
       - AWS
+      - APD Machine Credential
       - Splunk Admin
     project: APD Extras
     playbook: demos/splunk/install-splunk.yml
@@ -110,6 +111,7 @@ controller_templates:
     inventory: Ansible Product Demos Inventory
     credentials:
       - AWS
+      - APD Machine Credential
       - Splunk Admin
     project: APD Extras
     playbook: demos/splunk/configure-splunk.yml
