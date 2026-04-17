@@ -50,12 +50,24 @@
         state: present
 
   tasks:
-    - name: Download Splunk Enterprise
+    - name: Download Splunk Enterprise from HTTPS
       ansible.builtin.get_url:
         url: '{{ splunk.build_location }}'
         dest: /tmp/splunk.tgz
         mode: '0644'
-      when: splunk_download_url | length > 0
+      when:
+        - splunk_download_url | length > 0
+        - not splunk_download_url.startswith('s3://')
+
+    - name: Download Splunk Enterprise from S3
+      amazon.aws.s3_object:
+        bucket: '{{ splunk_download_url | regex_replace("^s3://([^/]+)/.*", "\1") }}'
+        object: '{{ splunk_download_url | regex_replace("^s3://[^/]+/", "") }}'
+        dest: /tmp/splunk.tgz
+        mode: get
+      when:
+        - splunk_download_url | length > 0
+        - splunk_download_url.startswith('s3://')
 
     - name: Create Splunk installation directory
       ansible.builtin.file:
