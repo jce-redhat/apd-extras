@@ -28,6 +28,14 @@
           variable or in an attached AAP credential
 
   tasks:
+    - name: Install AWS CLI (for S3 downloads)
+      ansible.builtin.package:
+        name: awscli
+        state: present
+      when:
+        - splunk_download_url | length > 0
+        - splunk_download_url.startswith('s3://')
+
     - name: Download Splunk Enterprise RPM from HTTPS
       ansible.builtin.get_url:
         url: '{{ splunk.build_location }}'
@@ -38,11 +46,12 @@
         - not splunk_download_url.startswith('s3://')
 
     - name: Download Splunk Enterprise RPM from S3
-      amazon.aws.s3_object:
-        bucket: '{{ splunk_download_url | regex_replace("^s3://([^/]+)/.*", "\1") }}'
-        object: '{{ splunk_download_url | regex_replace("^s3://[^/]+/", "") }}'
-        dest: /tmp/splunk.rpm
-        mode: get
+      ansible.builtin.command:
+        cmd: aws s3 cp {{ splunk_download_url }} /tmp/splunk.rpm
+        creates: /tmp/splunk.rpm
+      environment:
+        AWS_ACCESS_KEY_ID: '{{ lookup("env", "AWS_ACCESS_KEY_ID") }}'
+        AWS_SECRET_ACCESS_KEY: '{{ lookup("env", "AWS_SECRET_ACCESS_KEY") }}'
       when:
         - splunk_download_url | length > 0
         - splunk_download_url.startswith('s3://')
