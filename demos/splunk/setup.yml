@@ -100,11 +100,10 @@ controller_templates:
           type: text
           default: apd-splunk
         - question_name: Splunk download URL
-          description: URL to Splunk Enterprise .tgz file (or leave default for pre-staged S3)
+          description: URL to Splunk Enterprise .tgz file (required)
           variable: splunk_download_url
-          required: false
+          required: true
           type: text
-          default: ''
 
   - name: Splunk | Configure Splunk settings
     job_type: run
@@ -174,6 +173,10 @@ controller_workflows:
             - t3.large
             - t3.xlarge
           default: t3.medium
+        - question_name: Splunk download URL
+          type: text
+          variable: splunk_download_url
+          required: true
     simplified_workflow_nodes:
       - identifier: Create Keypair
         unified_job_template: Cloud | AWS | Create Keypair

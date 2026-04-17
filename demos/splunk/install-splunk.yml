@@ -55,7 +55,7 @@
         url: '{{ splunk.build_location }}'
         dest: /tmp/splunk.tgz
         mode: '0644'
-      when: splunk.build_location is defined
+      when: splunk_download_url | length > 0
 
     - name: Create Splunk installation directory
       ansible.builtin.file:
@@ -72,7 +72,7 @@
         remote_src: true
         owner: '{{ splunk.user }}'
         group: '{{ splunk.group }}'
-      when: splunk.build_location is defined
+      when: splunk_download_url | length > 0
 
     - name: Accept Splunk license and set admin password
       ansible.builtin.command:
