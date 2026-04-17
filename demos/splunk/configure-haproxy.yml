@@ -1,0 +1,143 @@
+---
+- name: Configure HAProxy for Splunk Web SSL termination
+  hosts: "{{ splunk_instance_name | default('apd-splunk') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    cert_dir: /etc/haproxy
+    cert_key_file: "{{ cert_dir }}/splunk.key"
+    cert_file: "{{ cert_dir }}/splunk.crt"
+    cert_pem_file: "{{ cert_dir }}/splunk.pem"
+    haproxy_config: /etc/haproxy/haproxy.cfg
+
+  tasks:
+    - name: Install HAProxy
+      ansible.builtin.yum:
+        name: haproxy
+        state: present
+
+    - name: Ensure certificate directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generate self-signed certificate private key
+      ansible.builtin.command:
+        cmd: >
+          openssl genrsa -out {{ cert_key_file }} 2048
+        creates: "{{ cert_key_file }}"
+
+    - name: Set private key permissions
+      ansible.builtin.file:
+        path: "{{ cert_key_file }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Generate self-signed certificate
+      ansible.builtin.command:
+        cmd: >
+          openssl req -new -x509 -key {{ cert_key_file }}
+          -out {{ cert_file }}
+          -days 365
+          -subj "/C=US/ST=State/L=City/O=Ansible Product Demos/CN={{ splunk_instance_name | default('apd-splunk') }}"
+        creates: "{{ cert_file }}"
+
+    - name: Combine certificate and key into PEM file for HAProxy
+      ansible.builtin.shell:
+        cmd: cat {{ cert_file }} {{ cert_key_file }} > {{ cert_pem_file }}
+        creates: "{{ cert_pem_file }}"
+
+    - name: Set PEM file permissions
+      ansible.builtin.file:
+        path: "{{ cert_pem_file }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Configure HAProxy for SSL termination
+      ansible.builtin.copy:
+        dest: "{{ haproxy_config }}"
+        content: |
+          global
+              log         127.0.0.1 local2
+              chroot      /var/lib/haproxy
+              pidfile     /var/run/haproxy.pid
+              maxconn     4000
+              user        haproxy
+              group       haproxy
+              daemon
+              stats socket /var/lib/haproxy/stats
+
+          defaults
+              mode                    http
+              log                     global
+              option                  httplog
+              option                  dontlognull
+              option http-server-close
+              option forwardfor       except 127.0.0.0/8
+              option                  redispatch
+              retries                 3
+              timeout http-request    10s
+              timeout queue           1m
+              timeout connect         10s
+              timeout client          1m
+              timeout server          1m
+              timeout http-keep-alive 10s
+              timeout check           10s
+              maxconn                 3000
+
+          frontend https_front
+              bind *:443 ssl crt {{ cert_pem_file }}
+              default_backend splunk_web
+
+          backend splunk_web
+              balance roundrobin
+              http-response replace-header Location ^http://(.*)$ https://\1
+              server splunk 127.0.0.1:8000 check
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart haproxy
+
+    - name: Configure SELinux to allow HAProxy network connections
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect
+        state: true
+        persistent: true
+
+    - name: Configure SELinux port label for Splunk port 8000
+      community.general.seport:
+        ports: 8000
+        proto: tcp
+        setype: http_port_t
+        state: present
+
+    - name: Enable and start HAProxy service
+      ansible.builtin.systemd:
+        name: haproxy
+        state: started
+        enabled: true
+
+  handlers:
+    - name: restart haproxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
+
+  post_tasks:
+    - name: Get public IP from instance metadata
+      ansible.builtin.uri:
+        url: http://169.254.169.254/latest/meta-data/public-ipv4
+        return_content: true
+      register: _public_ip
+
+    - name: Display HAProxy configuration summary
+      ansible.builtin.debug:
+        msg:
+          - "Splunk Enterprise HTTPS URL: https://{{ _public_ip.content }}"
+
+...
+# vim: ft=yaml.ansible

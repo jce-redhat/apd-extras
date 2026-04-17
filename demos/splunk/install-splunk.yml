@@ -1,0 +1,116 @@
+---
+- name: Install Splunk Enterprise on EC2 instance
+  hosts: "{{ splunk_instance_name | default('apd-splunk') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    splunk_download_url: '{{ splunk_download_url | default("") }}'
+    # Splunk installation defaults
+    splunk_defaults:
+      user: splunk
+      group: splunk
+      exec: /opt/splunk/bin/splunk
+      home: /opt/splunk
+      license_uri: null  # Use Splunk Free license
+      admin_password: '{{ lookup("env", "SPLUNK_PASSWORD") | default("changeme123") }}'
+      opt:
+        splunk_home_ownership_enforcement: false
+
+  tasks:
+    - name: Ensure Splunk admin password is set
+      ansible.builtin.assert:
+        that:
+          - 'lookup("env", "SPLUNK_PASSWORD") | length > 0'
+        fail_msg: >
+          'SPLUNK_PASSWORD' variable must be set, either as an environment
+          variable or in an attached AAP credential
+
+    - name: Download Splunk Enterprise RPM from HTTPS
+      ansible.builtin.get_url:
+        url: '{{ splunk_download_url }}'
+        dest: /tmp/splunk.rpm
+        mode: '0644'
+      when:
+        - splunk_download_url | length > 0
+        - not splunk_download_url.startswith('s3://')
+
+    - name: Download Splunk Enterprise RPM from S3
+      when:
+        - splunk_download_url | length > 0
+        - splunk_download_url.startswith('s3://')
+      block:
+        - name: Get Splunk Enterprise RPM from S3 URL
+          amazon.aws.s3_object:
+            bucket: '{{ splunk_download_url | regex_replace("^s3://([^/]+)/.*", "\1") }}'
+            object: '{{ splunk_download_url | regex_replace("^s3://[^/]+/", "") }}'
+            dest: /tmp/splunk-s3.rpm
+            mode: get
+          delegate_to: localhost
+          become: false
+
+        - name: Copy Splunk RPM from execution environment to target
+          ansible.builtin.copy:
+            src: /tmp/splunk-s3.rpm
+            dest: /tmp/splunk.rpm
+            mode: '0644'
+
+    - name: Install Splunk Enterprise RPM
+      ansible.builtin.yum:
+        name: /tmp/splunk.rpm
+        state: present
+        disable_gpg_check: true
+      when: splunk_download_url | length > 0
+
+    - name: Create user-seed.conf for admin user
+      ansible.builtin.copy:
+        dest: '{{ splunk_defaults.home }}/etc/system/local/user-seed.conf'
+        content: |
+          [user_info]
+          USERNAME = admin
+          PASSWORD = {{ splunk_defaults.admin_password }}
+        owner: '{{ splunk_defaults.user }}'
+        group: '{{ splunk_defaults.group }}'
+        mode: '0600'
+
+    - name: Accept Splunk license and start for first time
+      ansible.builtin.command:
+        cmd: >
+          {{ splunk_defaults.exec }} start
+          --accept-license
+          --answer-yes
+          --no-prompt
+        creates: '{{ splunk_defaults.home }}/etc/splunk-launch.conf'
+      become_user: '{{ splunk_defaults.user }}'
+
+    - name: Check if Splunk boot-start is already enabled
+      ansible.builtin.stat:
+        path: /etc/systemd/system/Splunkd.service
+      register: _splunk_systemd_unit
+
+    - name: Enable Splunk to start at boot (systemd)
+      ansible.builtin.command:
+        cmd: >
+          {{ splunk_defaults.exec }} enable boot-start
+          -systemd-managed 1
+          -user {{ splunk_defaults.user }}
+          --accept-license
+          --answer-yes
+          --no-prompt
+      when:
+        - not _splunk_systemd_unit.stat.exists
+
+    - name: Start Splunk service (systemd)
+      ansible.builtin.systemd:
+        name: Splunkd
+        state: started
+        enabled: true
+
+    - name: Display Splunk web URL
+      ansible.builtin.debug:
+        msg:
+          - "Splunk Enterprise installed successfully"
+          - "Local Splunk Web URL: http://{{ ansible_default_ipv4.address }}:8000"
+
+...
+# vim: ft=yaml.ansible

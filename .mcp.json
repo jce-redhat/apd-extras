@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "aap-platform-configuration": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/platform_configuration",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    },
+    "aap-inventory-management": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/inventory_management",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    },
+    "aap-security-compliance": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/security_compliance",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    },
+    "aap-system-monitoring": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/system_monitoring",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    },
+    "aap-user-management": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/user_management",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    },
+    "aap-job-management": {
+      "type": "http",
+      "url": "${AAP_MCP_URL}/mcp/job_management",
+      "headers": {
+        "Authorization": "Bearer ${AAP_MCP_TOKEN}"
+      }
+    }
+  }
+}

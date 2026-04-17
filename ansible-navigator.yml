@@ -23,6 +23,8 @@ ansible-navigator:
         - SN_HOST
         - SN_USERNAME
         - SN_PASSWORD
+        - SPLUNK_USER
+        - SPLUNK_PASSWORD
   logging:
     level: info
     append: false
