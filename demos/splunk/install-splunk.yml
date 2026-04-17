@@ -93,18 +93,18 @@
         - not splunk_systemd_unit.stat.exists
         - ansible_service_mgr != 'systemd'
 
-    - name: Ensure Splunk is running
-      ansible.builtin.command:
-        cmd: '{{ splunk.exec }} status'
-      register: splunk_status
-      changed_when: false
-      failed_when: false
+    - name: Start Splunk service (systemd)
+      ansible.builtin.systemd:
+        name: Splunkd
+        state: started
+        enabled: true
+      when: ansible_service_mgr == 'systemd'
 
-    - name: Start Splunk if not running
-      ansible.builtin.command:
-        cmd: '{{ splunk.exec }} start'
-      become_user: '{{ splunk.user }}'
-      when: splunk_status.rc != 0
+    - name: Start Splunk service (non-systemd)
+      ansible.builtin.service:
+        name: splunk
+        state: started
+      when: ansible_service_mgr != 'systemd'
 
   post_tasks:
     - name: Display Splunk web URL
