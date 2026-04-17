@@ -66,10 +66,16 @@
 
   handlers:
     - name: restart splunk
+      ansible.builtin.systemd:
+        name: Splunkd
+        state: restarted
+      when: ansible_service_mgr == 'systemd'
+
+    - name: restart splunk
       ansible.builtin.service:
         name: splunk
         state: restarted
-      become: true
+      when: ansible_service_mgr != 'systemd'
 
   post_tasks:
     - name: Display configuration summary
