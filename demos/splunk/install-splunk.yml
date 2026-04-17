@@ -35,6 +35,12 @@
           - gzip
         state: present
 
+    - name: Create Splunk group
+      ansible.builtin.group:
+        name: '{{ splunk.group }}'
+        system: true
+        state: present
+
     - name: Create Splunk user
       ansible.builtin.user:
         name: '{{ splunk.user }}'
