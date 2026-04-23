@@ -1,0 +1,158 @@
+---
+- name: Install Splunk Universal Forwarder on client instance
+  hosts: "{{ client_instance_name | default('apd-splunk-client') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    _splunk_forwarder_download_url: '{{ splunk_forwarder_download_url | default("") }}'
+    _splunk_indexer_host: '{{ splunk_indexer_host | default("apd-splunk") }}'
+    _splunk_indexer_port: '{{ splunk_indexer_port | default("9997") }}'
+
+    # Splunk Universal Forwarder defaults
+    forwarder_defaults:
+      user: splunkfwd
+      group: splunkfwd
+      exec: /opt/splunkforwarder/bin/splunk
+      home: /opt/splunkforwarder
+      admin_password: '{{ lookup("env", "SPLUNK_PASSWORD") | default("changeme123") }}'
+      opt:
+        splunk_home_ownership_enforcement: false
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - _splunk_indexer_host | length > 0
+          - 'lookup("env", "SPLUNK_PASSWORD") | length > 0'
+        fail_msg: >
+          Required variables missing: splunk_indexer_host must be set,
+          and SPLUNK_PASSWORD environment variable must be defined
+
+    - name: Download Splunk Universal Forwarder RPM from HTTPS
+      ansible.builtin.get_url:
+        url: '{{ _splunk_forwarder_download_url }}'
+        dest: /tmp/splunkforwarder.rpm
+        mode: '0644'
+      when:
+        - _splunk_forwarder_download_url | length > 0
+        - not _splunk_forwarder_download_url.startswith('s3://')
+
+    - name: Download Splunk Universal Forwarder RPM from S3
+      when:
+        - _splunk_forwarder_download_url | length > 0
+        - _splunk_forwarder_download_url.startswith('s3://')
+      block:
+        - name: Get Splunk Universal Forwarder RPM from S3 URL
+          amazon.aws.s3_object:
+            bucket: '{{ _splunk_forwarder_download_url | regex_replace("^s3://([^/]+)/.*", "\1") }}'
+            object: '{{ _splunk_forwarder_download_url | regex_replace("^s3://[^/]+/", "") }}'
+            dest: /tmp/splunkforwarder-s3.rpm
+            mode: get
+          delegate_to: localhost
+          become: false
+
+        - name: Copy Splunk Forwarder RPM from execution environment to target
+          ansible.builtin.copy:
+            src: /tmp/splunkforwarder-s3.rpm
+            dest: /tmp/splunkforwarder.rpm
+            mode: '0644'
+
+    - name: Install Splunk Universal Forwarder RPM
+      ansible.builtin.yum:
+        name: /tmp/splunkforwarder.rpm
+        state: present
+        disable_gpg_check: true
+      when: _splunk_forwarder_download_url | length > 0
+
+    - name: Create user-seed.conf for admin user
+      ansible.builtin.copy:
+        dest: '{{ forwarder_defaults.home }}/etc/system/local/user-seed.conf'
+        content: |
+          [user_info]
+          USERNAME = admin
+          PASSWORD = {{ forwarder_defaults.admin_password }}
+        owner: '{{ forwarder_defaults.user }}'
+        group: '{{ forwarder_defaults.group }}'
+        mode: '0600'
+
+    - name: Accept Splunk license and start for first time
+      ansible.builtin.command:
+        cmd: >
+          {{ forwarder_defaults.exec }} start
+          --accept-license
+          --answer-yes
+          --no-prompt
+        creates: '{{ forwarder_defaults.home }}/etc/splunk-launch.conf'
+      become_user: '{{ forwarder_defaults.user }}'
+
+    - name: Configure outputs to send data to indexer
+      ansible.builtin.copy:
+        dest: '{{ forwarder_defaults.home }}/etc/system/local/outputs.conf'
+        content: |
+          [tcpout]
+          defaultGroup = primary_indexers
+
+          [tcpout:primary_indexers]
+          server = {{ _splunk_indexer_host }}:{{ _splunk_indexer_port }}
+          compressed = true
+        owner: '{{ forwarder_defaults.user }}'
+        group: '{{ forwarder_defaults.group }}'
+        mode: '0644'
+      notify: Restart Splunk Forwarder
+
+    - name: Configure inputs to monitor /var/log
+      ansible.builtin.copy:
+        dest: '{{ forwarder_defaults.home }}/etc/system/local/inputs.conf'
+        content: |
+          [default]
+          host = {{ ansible_hostname }}
+
+          [monitor:///var/log]
+          disabled = false
+          index = main
+          sourcetype = syslog
+        owner: '{{ forwarder_defaults.user }}'
+        group: '{{ forwarder_defaults.group }}'
+        mode: '0644'
+      notify: Restart Splunk Forwarder
+
+    - name: Check if Splunk boot-start is already enabled
+      ansible.builtin.stat:
+        path: /etc/systemd/system/SplunkForwarder.service
+      register: _splunk_forwarder_systemd_unit
+
+    - name: Enable Splunk Forwarder to start at boot (systemd)
+      ansible.builtin.command:
+        cmd: >
+          {{ forwarder_defaults.exec }} enable boot-start
+          -systemd-managed 1
+          -user {{ forwarder_defaults.user }}
+          --accept-license
+          --answer-yes
+          --no-prompt
+      when:
+        - not _splunk_forwarder_systemd_unit.stat.exists
+
+    - name: Start Splunk Forwarder service (systemd)
+      ansible.builtin.systemd:
+        name: SplunkForwarder
+        state: started
+        enabled: true
+
+    - name: Display installation summary
+      ansible.builtin.debug:
+        msg:
+          - "Splunk Universal Forwarder installed successfully"
+          - "Forwarding to: {{ _splunk_indexer_host }}:{{ _splunk_indexer_port }}"
+          - "Monitoring: /var/log"
+          - "Forwarder home: {{ forwarder_defaults.home }}"
+
+  handlers:
+    - name: Restart Splunk Forwarder
+      ansible.builtin.systemd:
+        name: SplunkForwarder
+        state: restarted
+
+...
+# vim: ft=yaml.ansible

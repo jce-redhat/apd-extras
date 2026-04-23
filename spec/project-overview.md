@@ -7,3 +7,6 @@ When creating demo content in the apd-extras repository:
 * Use Inventories, Credentials, Projects, Job Templates, and other AAP resources created by the main APD repo rather than creating new versions of the same.  See existing demo content for examples.
 * Each demo gets its own subdirectory under demos/.  Ensure each demo has a setup.yml file for creating AAP resources with config as code, a skeleton README.md file, and any playbooks associated with the demo.
 
+## AAP integration
+
+Credentials will be provided in AAP_* environment variables for authenticating to an AAP deployment.  Use this deployment for installing apd-extras and testing new demo content.  When interacting with the AAP deployment, first try MCP toolsets, and fall back to direct API calls with curl.  Do not write playbooks, python code, or other tools to interact with the AAP deployment unless they are part of apd-extras demo content.

@@ -6,7 +6,8 @@ This demo deploys Splunk Enterprise on an AWS EC2 instance and demonstrates auto
 
 The Splunk demo creates:
 - Custom AAP credential type for Splunk admin credentials
-- EC2 instance running Amazon Linux 2023 (t3.medium minimum)
+- EC2 instance running RHEL 9 with Splunk Enterprise (t3.medium minimum)
+- Additional RHEL 9 EC2 instance for testing/demonstration (t3.small default)
 - Splunk Enterprise installation with Free license
 - Configured data receiving on port 9997
 - Splunk Web interface on port 8000
@@ -22,6 +23,7 @@ This demo requires the following resources from Ansible Product Demos:
 - AAP Credential for API access
 - Cloud | AWS | Create Keypair job template
 - Cloud | AWS | Create VPC job template
+- Cloud | AWS | Create VM job template
 - AWS Inventory sync job template
 - SUBMIT FEEDBACK job template
 
@@ -67,14 +69,18 @@ Run the **Deploy Splunk Enterprise in AWS** workflow and provide:
 - AWS keypair public key content
 - Splunk instance name (default: apd-splunk)
 - Splunk instance type (default: t3.medium)
+- RHEL 9 instance name (default: apd-rhel9)
+- RHEL 9 instance type (default: t3.small)
+- Splunk download URL
 
 The workflow will:
 1. Create AWS keypair
 2. Create AWS VPC and subnet
-3. Deploy Splunk EC2 instance
+3. Deploy Splunk EC2 instance and RHEL 9 instance (in parallel)
 4. Sync AWS inventory
 5. Install Splunk Enterprise
 6. Configure Splunk settings
+7. Configure HAProxy SSL
 
 ### Option 2: Using Individual Job Templates
 
@@ -128,11 +134,14 @@ After successful installation:
 ## Cost Considerations
 
 **Warning**: This demo creates resources with ongoing costs:
-- t3.medium EC2 instance: ~$0.0416/hour (~$30/month if running continuously)
-- RHEL licensing: Additional hourly charges for Red Hat subscription
-- EBS storage: ~$12/month for 120GB gp3 volume
+- t3.medium EC2 instance (Splunk): ~$0.0416/hour (~$30/month if running continuously)
+- t3.small EC2 instance (RHEL 9): ~$0.0208/hour (~$15/month if running continuously)
+- RHEL licensing: Additional hourly charges for Red Hat subscription (both instances)
+- EBS storage: ~$12/month for 120GB gp3 volume (Splunk) + default storage for RHEL 9
 
-**Recommendation**: Terminate the EC2 instance when not in use to avoid ongoing charges.
+**Total estimated cost**: ~$60-70/month if running continuously
+
+**Recommendation**: Terminate the EC2 instances when not in use to avoid ongoing charges.
 
 ## Extending the Demo
 

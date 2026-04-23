@@ -38,6 +38,11 @@ controller_credentials:
       splunk_password: '{{ lookup("env","SPLUNK_PASSWORD") | default(vault_splunk_password, true) | default("changeme123") }}'
       splunk_validate_certs: '{{ lookup("env","SPLUNK_VALIDATE_CERTS") | default("true") }}'
 
+controller_execution_environments:
+  - name: Splunk Demo EE
+    image: quay.io/jce-redhat/splunk-ee:latest
+    organization: Ansible Product Demos (APD)
+
 controller_templates:
   - name: Splunk | AWS | Deploy Splunk Enterprise EC2 instance
     job_type: run
@@ -46,6 +51,7 @@ controller_templates:
       - AWS
     project: APD Extras
     playbook: demos/splunk/deploy-splunk-ec2.yml
+    execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
       name: ''
@@ -101,6 +107,7 @@ controller_templates:
       - APD Machine Credential
     project: APD Extras
     playbook: demos/splunk/configure-haproxy.yml
+    execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
       name: ''
@@ -121,6 +128,7 @@ controller_templates:
       - Splunk Enterprise Admin
     project: APD Extras
     playbook: demos/splunk/install-splunk.yml
+    execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
       name: ''
@@ -146,6 +154,7 @@ controller_templates:
       - Splunk Enterprise Admin
     project: APD Extras
     playbook: demos/splunk/configure-splunk.yml
+    execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
       name: ''
@@ -164,6 +173,38 @@ controller_templates:
             - 'true'
             - 'false'
           default: 'true'
+
+  - name: Splunk | Install Universal Forwarder
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+      - APD Machine Credential
+      - Splunk Enterprise Admin
+    project: APD Extras
+    playbook: demos/splunk/install-forwarder.yml
+    execution_environment: Splunk Demo EE
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Client instance name
+          variable: client_instance_name
+          required: true
+          type: text
+          default: apd-splunk-client
+        - question_name: Splunk indexer host
+          description: Hostname or IP of Splunk Enterprise server
+          variable: splunk_indexer_host
+          required: true
+          type: text
+          default: apd-splunk
+        - question_name: Splunk Universal Forwarder download URL
+          description: URL to Universal Forwarder RPM file (https:// or s3://)
+          variable: splunk_forwarder_download_url
+          required: true
+          type: text
 
 controller_workflows:
   - name: Deploy Splunk Enterprise in AWS
@@ -205,22 +246,43 @@ controller_workflows:
             - t3.large
             - t3.xlarge
           default: t3.medium
+        - question_name: RHEL 9 instance name
+          type: text
+          variable: create_vm_vm_name
+          required: true
+          default: apd-splunk-client
+        - question_name: RHEL 9 instance type
+          type: multiplechoice
+          variable: create_vm_aws_instance_size
+          required: true
+          choices:
+            - t3.small
+            - t3.medium
+            - t3.large
+          default: t3.small
         - question_name: Splunk download URL
           description: URL to Splunk Enterprise RPM file (https:// or s3://)
           type: text
           variable: splunk_download_url
+          required: true
+        - question_name: Splunk Universal Forwarder download URL
+          description: URL to Universal Forwarder RPM file (https:// or s3://)
+          type: text
+          variable: splunk_forwarder_download_url
           required: true
     simplified_workflow_nodes:
       - identifier: Create Keypair
         unified_job_template: Cloud | AWS | Create Keypair
         success_nodes:
           - Create Splunk instance
+          - Create RHEL9 instance
         failure_nodes:
           - Ticket - Keypair Failed
       - identifier: Create VPC
         unified_job_template: Cloud | AWS | Create VPC
         success_nodes:
           - Create Splunk instance
+          - Create RHEL9 instance
         failure_nodes:
           - Ticket - VPC Failed
       - identifier: Ticket - Keypair Failed
@@ -232,14 +294,29 @@ controller_workflows:
         all_parents_must_converge: true
         success_nodes:
           - Inventory Sync
+      - identifier: Create RHEL9 instance
+        unified_job_template: Cloud | AWS | Create VM
+        all_parents_must_converge: true
+        extra_data:
+          create_vm_vm_deployment: splunk_demo
+          create_vm_vm_purpose: demo
+          create_vm_vm_environment: Dev
+          vm_blueprint: rhel9
+        success_nodes:
+          - Inventory Sync
       - identifier: Inventory Sync
         unified_job_template: AWS Inventory
+        all_parents_must_converge: true
         success_nodes:
           - Install Splunk
+          - Install Forwarder
       - identifier: Install Splunk
         unified_job_template: Splunk | Install Splunk Enterprise
         success_nodes:
           - Configure Splunk
+      - identifier: Install Forwarder
+        unified_job_template: Splunk | Install Universal Forwarder
+        success_nodes: []
       - identifier: Configure Splunk
         unified_job_template: Splunk | Configure Splunk settings
         success_nodes:
