@@ -48,7 +48,7 @@ controller_inventory_sources:
   - name: ServiceNow CMDB
     source: scm
     source_project: APD Extras
-    source_path: demos/snow-cmdb/now.yml
+    source_path: demos/snow/now.yml
     description: Dynamic inventory pulled from the ServiceNow CMDB
     organization: Ansible Product Demos (APD)
     inventory: Ansible Product Demos Inventory
@@ -62,7 +62,7 @@ controller_templates:
     credentials:
       - SNOW
     project: APD Extras
-    playbook: demos/snow-cmdb/bulk-add-records.yml
+    playbook: demos/snow/bulk-add-records.yml
     survey_enabled: false
 
   - name: SNOW | Bulk delete demo CMDB server records
@@ -71,7 +71,7 @@ controller_templates:
     credentials:
       - SNOW
     project: APD Extras
-    playbook: demos/snow-cmdb/bulk-delete-records.yml
+    playbook: demos/snow/bulk-delete-records.yml
     survey_enabled: false
 
   - name: SNOW | Create a server record in the CMDB
@@ -80,7 +80,7 @@ controller_templates:
     credentials:
       - SNOW
     project: APD Extras
-    playbook: demos/snow-cmdb/add-server-record.yml
+    playbook: demos/snow/add-server-record.yml
     survey_enabled: true
     survey:
       name: ''
@@ -110,7 +110,7 @@ controller_templates:
     credentials:
       - SNOW
     project: APD Extras
-    playbook: demos/snow-cmdb/delete-server-record.yml
+    playbook: demos/snow/delete-server-record.yml
     survey_enabled: true
     survey:
       name: ''
