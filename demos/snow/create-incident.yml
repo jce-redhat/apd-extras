@@ -1,0 +1,91 @@
+---
+- name: Create incident in ServiceNow
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # Normalize input variables with defaults
+    _incident_short_description: '{{ incident_short_description | default("") }}'
+    _incident_description: '{{ incident_description | default("") }}'
+    _incident_caller: '{{ incident_caller | default("") }}'
+    _incident_urgency: '{{ incident_urgency | default("3") }}'
+    _incident_impact: '{{ incident_impact | default("3") }}'
+    _incident_category: '{{ incident_category | default("") }}'
+    _incident_subcategory: '{{ incident_subcategory | default("") }}'
+    _incident_assigned_to: '{{ incident_assigned_to | default("") }}'
+    _affected_host: '{{ affected_host | default("") }}'
+    _event_logs: '{{ event_logs | default("") }}'
+    _event_timestamp: '{{ event_timestamp | default("") }}'
+    _event_source: '{{ event_source | default("Splunk") }}'
+    _splunk_web_link: '{{ splunk_web_link | default("") }}'
+    _username_created: '{{ username_created | default("") }}'
+
+  tasks:
+    - name: Validate required fields
+      ansible.builtin.assert:
+        that:
+          - _incident_short_description | length > 0
+        fail_msg: 'incident_short_description is required'
+
+    - name: Build incident description with enrichment data
+      ansible.builtin.set_fact:
+        _full_description: |
+          {{ _incident_description }}
+
+          {% if _affected_host | length > 0 %}
+          Affected Host: {{ _affected_host }}
+          {% endif %}
+          {% if _username_created | length > 0 %}
+          User Created: {{ _username_created }}
+          {% endif %}
+          {% if _event_timestamp | length > 0 %}
+          Event Time: {{ _event_timestamp }}
+          {% endif %}
+          {% if _event_source | length > 0 %}
+          Event Source: {{ _event_source }}
+          {% endif %}
+          {% if _event_logs | length > 0 %}
+
+          Event Details:
+          {{ _event_logs }}
+          {% endif %}
+          {% if _splunk_web_link | length > 0 %}
+
+          Splunk Web Link: {{ _splunk_web_link }}
+          {% endif %}
+
+    - name: Look up assigned user sys_id
+      servicenow.itsm.api_info:
+        resource: sys_user
+        sysparm_query: user_name={{ _incident_assigned_to }}
+      register: _assigned_user
+      when: _incident_assigned_to | length > 0
+
+    - name: Create ServiceNow incident
+      servicenow.itsm.incident:
+        state: new
+        short_description: '{{ _incident_short_description }}'
+        description: '{{ _full_description }}'
+        caller: '{{ _incident_caller if _incident_caller | length > 0 else omit }}'
+        urgency: '{{ _incident_urgency }}'
+        impact: '{{ _incident_impact }}'
+        other:
+          category: '{{ _incident_category if _incident_category | length > 0 else omit }}'
+          subcategory: '{{ _incident_subcategory if _incident_subcategory | length > 0 else omit }}'
+          assigned_to: '{{ _assigned_user.record[0].sys_id if (_assigned_user is defined and not _assigned_user.skipped | default(false) and _assigned_user.record | length > 0) else omit }}'
+          u_event_source: '{{ _event_source }}'
+          cmdb_ci: '{{ _affected_host if _affected_host | length > 0 else omit }}'
+      register: _incident
+
+    - name: Display incident information
+      ansible.builtin.debug:
+        msg:
+          - "Incident created successfully"
+          - "Incident Number: {{ _incident.record.number }}"
+          - "Incident SysID: {{ _incident.record.sys_id }}"
+          - "Short Description: {{ _incident.record.short_description }}"
+          - "State: {{ _incident.record.state }}"
+          - "URL: {{ lookup('ansible.builtin.env', 'SN_HOST') }}/nav_to.do?uri=incident.do?sys_id={{ _incident.record.sys_id }}"
+
+...
+# vim: ft=yaml.ansible

@@ -86,6 +86,17 @@
         creates: '{{ forwarder_defaults.home }}/etc/splunk-launch.conf'
       become_user: '{{ forwarder_defaults.user }}'
 
+    - name: Resolve Splunk indexer hostname to IP from inventory
+      ansible.builtin.set_fact:
+        _resolved_indexer_host: "{{ hostvars[_splunk_indexer_host]['ansible_host'] | default(_splunk_indexer_host) }}"
+      delegate_to: localhost
+      when: _splunk_indexer_host in hostvars
+
+    - name: Use provided hostname if not found in inventory
+      ansible.builtin.set_fact:
+        _resolved_indexer_host: "{{ _splunk_indexer_host }}"
+      when: _splunk_indexer_host not in hostvars
+
     - name: Configure outputs to send data to indexer
       ansible.builtin.copy:
         dest: '{{ forwarder_defaults.home }}/etc/system/local/outputs.conf'
@@ -94,7 +105,7 @@
           defaultGroup = primary_indexers
 
           [tcpout:primary_indexers]
-          server = {{ _splunk_indexer_host }}:{{ _splunk_indexer_port }}
+          server = {{ _resolved_indexer_host }}:{{ _splunk_indexer_port }}
           compressed = true
         owner: '{{ forwarder_defaults.user }}'
         group: '{{ forwarder_defaults.group }}'

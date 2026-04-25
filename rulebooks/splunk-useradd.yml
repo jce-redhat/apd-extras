@@ -1,0 +1,30 @@
+---
+- name: Listen for events on a webhook from Splunk
+  hosts: all
+  sources:
+    - name: Splunk Events
+      ansible.eda.generic:
+  rules:
+    - name: Create ServiceNow incident for RHEL useradd command
+      condition: event.payload.results.process == "useradd"
+      action:
+        run_job_template:
+          name: 'SNOW | Create incident from Splunk event'
+          organization: 'Ansible Product Demos (APD)'
+          job_args:
+            extra_vars:
+              incident_short_description: "User account created on {{ event.payload.results.host }}"
+              incident_description: "A new user account was created and detected by Splunk monitoring."
+              incident_category: "Security"
+              incident_subcategory: "Account Creation"
+              incident_urgency: "2"
+              incident_impact: "2"
+              incident_assigned_to: "edademo"
+              affected_host: "{{ event.payload.results.host }}"
+              event_logs: "{{ event.payload.results['_raw'] }}"
+              event_source: "Splunk EDA Add-on"
+              splunk_web_link: "{{ event.payload['results_web_link'] }}"
+              username_created: "{{ event.payload.results['name'] }}"
+
+...
+# vim: ft=yaml.ansible

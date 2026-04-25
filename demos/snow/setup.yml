@@ -121,6 +121,90 @@ controller_templates:
           required: true
           type: text
 
+  - name: SNOW | Create incident from Splunk event
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - SNOW
+    project: APD Extras
+    playbook: demos/snow/create-incident.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Short Description
+          variable: incident_short_description
+          required: true
+          type: text
+        - question_name: Description
+          variable: incident_description
+          required: false
+          type: textarea
+        - question_name: Category
+          variable: incident_category
+          required: false
+          type: multiplechoice
+          choices:
+            - Inquiry / Help
+            - Software
+            - Hardware
+            - Network
+            - Database
+            - Security
+        - question_name: Urgency
+          variable: incident_urgency
+          required: false
+          type: multiplechoice
+          choices:
+            - '1'
+            - '2'
+            - '3'
+            - '4'
+            - '5'
+          default: '3'
+        - question_name: Impact
+          variable: incident_impact
+          required: false
+          type: multiplechoice
+          choices:
+            - '1'
+            - '2'
+            - '3'
+            - '4'
+            - '5'
+          default: '3'
+        - question_name: Assigned To
+          variable: incident_assigned_to
+          required: false
+          type: multiplechoice
+          choices:
+            - ''
+            - edademo
+            - svc.desk
+            - jce
+          default: ''
+        - question_name: Affected Host
+          variable: affected_host
+          required: false
+          type: text
+        - question_name: Event Logs
+          variable: event_logs
+          required: false
+          type: textarea
+        - question_name: Event Timestamp
+          variable: event_timestamp
+          required: false
+          type: text
+        - question_name: Username Created
+          variable: username_created
+          required: false
+          type: text
+        - question_name: Splunk Web Link
+          variable: splunk_web_link
+          required: false
+          type: text
+
 controller_workflows:
   - name: 'ServiceNow: Create SNOW CMDB records'
     description: Create a set of pre-configured server records in the SNOW CMDB
