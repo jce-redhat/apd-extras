@@ -50,7 +50,7 @@ controller_templates:
     credentials:
       - AWS
     project: APD Extras
-    playbook: demos/splunk/deploy-splunk-ec2.yml
+    playbook: demos/eda_splunk/deploy-splunk-ec2.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -106,7 +106,7 @@ controller_templates:
       - AWS
       - APD Machine Credential
     project: APD Extras
-    playbook: demos/splunk/configure-haproxy.yml
+    playbook: demos/eda_splunk/configure-haproxy.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -127,7 +127,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/splunk/install-splunk.yml
+    playbook: demos/eda_splunk/install-splunk.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -153,7 +153,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/splunk/configure-splunk.yml
+    playbook: demos/eda_splunk/configure-splunk.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -182,7 +182,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/splunk/install-forwarder.yml
+    playbook: demos/eda_splunk/install-forwarder.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:

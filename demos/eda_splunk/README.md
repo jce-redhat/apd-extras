@@ -52,11 +52,11 @@ Or configure in the "Splunk Admin" credential in AAP after demo installation.
 ### Install the Demo
 
 Run the **APD Extras | Install extra demo** job template with:
-- **demo**: `splunk`
+- **demo**: `eda_splunk`
 
 Or using ansible-navigator:
 ```bash
-ansible-navigator run -m stdout playbooks/install-demo.yml -e demo=splunk
+ansible-navigator run -m stdout playbooks/install-demo.yml -e demo=eda_splunk
 ```
 
 ## Usage
