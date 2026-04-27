@@ -1,0 +1,24 @@
+---
+- name: Add user to Linux client with useradd
+  hosts: '{{ target_hosts | default(omit) }}'
+  become: true
+  gather_facts: true
+
+  vars:
+    _new_account_username: '{{ new_account_username | default("demouser") }}'
+
+  tasks:
+    - name: Get list of local users
+      ansible.builtin.getent:
+        database: passwd
+      register: _getent_passwd
+
+    - name: Create local user with useradd program
+      ansible.builtin.command:
+        cmd: >
+          useradd {{ _new_account_username }}
+        creates: /home/{{ _new_account_username }}
+      when: '_new_account_username not in _getent_passwd'
+
+...
+# vim: ft=yaml.ansible

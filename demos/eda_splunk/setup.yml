@@ -206,6 +206,31 @@ controller_templates:
           required: true
           type: text
 
+  - name: Splunk | Add user to Splunk RHEL client
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - APD Machine Credential
+    project: APD Extras
+    playbook: demos/eda_splunk/add-new-user.yml
+    execution_environment: Product Demos EE
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Splunk client instance name
+          variable: target_hosts
+          required: true
+          type: text
+          default: apd-splunk-client
+        - question_name: New user name
+          description: Username for new account
+          variable: new_account_username
+          required: true
+          type: text
+          default: demouser
+
 controller_workflows:
   - name: Deploy Splunk Enterprise in AWS
     description: Deploy Splunk Enterprise on an EC2 instance
