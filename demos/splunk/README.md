@@ -19,27 +19,21 @@ The Splunk demo creates:
 
 ### Required APD Resources
 This demo requires the following resources from Ansible Product Demos:
-- "Ansible Product Demos (APD)" organization
-- "Ansible Product Demos Inventory" with AWS dynamic inventory configured
-- AWS credential configured in AAP
-- AAP Credential for API access
 - Cloud | AWS | Create Keypair job template
 - Cloud | AWS | Create VPC job template
 - Cloud | AWS | Create VM job template
-- AWS Inventory sync job template
-- SUBMIT FEEDBACK job template
 
 ### AWS Requirements
 - AWS account with appropriate permissions
 - Sufficient EC2 quota for t3.medium instances (minimum 4GB RAM)
+- Sufficient EC2 quota for one Elastic IP address
 - VPC and subnet pre-created (default: aws-test-vpc, aws-test-subnet)
 - SSH keypair for EC2 access
 
 ### Splunk Requirements
-- **Splunk Binary**: This demo requires a Splunk Enterprise installation package
-  - **Option 1 (Recommended)**: Pre-stage Splunk Free .tgz in an S3 bucket and provide URL
-  - **Option 2**: Provide direct download URL from Splunk.com (requires authentication)
-  - **Option 3**: Modify `install-splunk.yml` to download from authenticated source
+- **Splunk Installation packages**: This demo requires Splunk RPMs downloaded from the [Splunk downloads page](https://www.splunk.com/en_us/download.html)
+  - **Option 1 (Recommended)**: Pre-stage Splunk Enterprise RPM and Splunk Universal Forwarder RPM in an S3 bucket and provide URL
+  - **Option 2**: Provide direct download URL for Splunk Enterprise RPM and Splunk Universal Forwarder RPM 
 
 ### Credentials
 Set the Splunk admin password before installation:
@@ -47,7 +41,7 @@ Set the Splunk admin password before installation:
 export SPLUNK_ADMIN_PASSWORD='YourSecurePassword123!'
 ```
 
-Or configure in the "Splunk Admin" credential in AAP after demo installation.
+Or configure in the "Splunk Admin" credential in AAP after demo installation but before running the Splunk deployment workflow.
 
 ## Installation
 
@@ -78,118 +72,18 @@ Run the **Deploy Splunk Enterprise in AWS** workflow and provide:
 The workflow will:
 1. Create AWS keypair
 2. Create AWS VPC and subnet
-3. Deploy Splunk EC2 instance and RHEL 9 instance (in parallel)
+3. Deploy Splunk Enterprise EC2 instance and RHEL 9 instance (in parallel)
 4. Sync AWS inventory
-5. Install Splunk Enterprise
-6. Configure Splunk settings
-7. Configure HAProxy SSL
-
-### Option 2: Using Individual Job Templates
-
-#### 1. Deploy EC2 Instance
-Run **Splunk | AWS | Deploy Splunk Enterprise EC2 instance**:
-- AWS region
-- VPC name
-- Subnet name
-- Keypair name
-- Instance name
-- Instance type
-
-#### 2. Sync AWS Inventory
-Run **AWS Inventory** to discover the new instance
-
-#### 3. Install Splunk
-Run **Splunk | Install Splunk Enterprise**:
-- Splunk instance name (must match EC2 instance name tag)
-- Splunk download URL (optional if using default)
-
-#### 4. Configure Splunk
-Run **Splunk | Configure Splunk settings**:
-- Splunk instance name
-- Enable Splunk Web (true/false)
+5. Install Splunk Enterprise on the Splunk server, and the Splunk Universal Forwarder on the RHEL 9 client
+6. Configure Splunk Enterprise
+7. Configure HAProxy for secure connections to Splunk Enterprise
 
 ## Accessing Splunk
 
 After successful installation:
-1. Find the EC2 instance public IP in AWS console or AAP inventory
-2. Access Splunk Web: `http://<public-ip>:8000`
+1. Find the EC2 instance Elastic IP in AWS console or AAP inventory
+2. Access Splunk Web: `https://<elastic-ip>/`
 3. Login with:
    - **Username**: `admin`
    - **Password**: Value of `SPLUNK_ADMIN_PASSWORD` environment variable
 
-## Architecture
-
-### EC2 Instance Specifications
-- **OS**: Red Hat Enterprise Linux 9
-- **Instance Type**: t3.medium (default) - 2 vCPU, 4GB RAM
-- **Storage**: 120GB gp3 EBS volume
-- **Security Group**: Ports 22, 8000, 8089, 9997 open
-
-### Splunk Configuration
-- **Installation Path**: `/opt/splunk`
-- **User**: `splunk`
-- **License**: Splunk Free (500MB/day indexing limit)
-- **Splunk Web**: Port 8000
-- **Management Port**: Port 8089
-- **Receiving Port**: Port 9997 (for forwarders)
-
-## Cost Considerations
-
-**Warning**: This demo creates resources with ongoing costs:
-- t3.medium EC2 instance (Splunk): ~$0.0416/hour (~$30/month if running continuously)
-- t3.small EC2 instance (RHEL 9): ~$0.0208/hour (~$15/month if running continuously)
-- RHEL licensing: Additional hourly charges for Red Hat subscription (both instances)
-- EBS storage: ~$12/month for 120GB gp3 volume (Splunk) + default storage for RHEL 9
-
-**Total estimated cost**: ~$60-70/month if running continuously
-
-**Recommendation**: Terminate the EC2 instances when not in use to avoid ongoing charges.
-
-## Extending the Demo
-
-### Event-Driven Ansible Integration
-See the **eda_splunk_snow** demo for an example of integrating Splunk with Event-Driven Ansible and ServiceNow:
-- Automated incident creation when Splunk detects security events
-- Webhook integration between Splunk and EDA
-- Enriched ServiceNow incidents with Splunk event data
-
-### Adding Forwarders
-Create additional job templates to:
-- Deploy Universal Forwarders to application servers
-- Configure forwarding to the Splunk indexer
-- Set up data inputs and parsing
-
-### Clustering
-Expand to multi-node deployment:
-- Search head cluster
-- Indexer cluster
-- Deployment server
-
-### Apps and Add-ons
-Install Splunk apps:
-- Security apps (ES, SOAR)
-- IT Operations apps (ITSI)
-- Data inputs (AWS, Linux, Windows)
-
-## Troubleshooting
-
-### Splunk Installation Fails
-- Verify `SPLUNK_ADMIN_PASSWORD` is set and meets complexity requirements
-- Check Splunk download URL is accessible from EC2 instance
-- Ensure sufficient disk space (120GB available)
-
-### Cannot Access Splunk Web
-- Verify security group allows port 8000 from your IP
-- Check Splunk service is running: `systemctl status splunk`
-- Verify public IP address is correct
-
-### Inventory Sync Doesn't Find Instance
-- Wait 30-60 seconds after EC2 deployment for instance to be fully tagged
-- Verify instance has correct tags (Name, owner, splunk_role)
-- Re-run AWS Inventory sync
-
-## References
-
-- [Splunk Enterprise Documentation](https://docs.splunk.com/Documentation/Splunk)
-- [Splunk Free License](https://www.splunk.com/en_us/products/splunk-enterprise/free-vs-enterprise.html)
-- [ansible-role-for-splunk](https://github.com/splunk/ansible-role-for-splunk)

@@ -13,24 +13,37 @@ The integration creates an automated response workflow:
 
 ## Prerequisites
 
-### Required Demos
+### Required APD Extras Demos
 This demo **requires** both of the following demos to be installed first:
-- **splunk**: Provides Splunk Enterprise deployment and Universal Forwarder configuration
-- **snow**: Provides ServiceNow credential and CMDB integration
+* **splunk**: Provides Splunk Enterprise deployment and Universal Forwarder configuration
+* **snow**: Provides ServiceNow credential and CMDB integration
 
-### Required AAP Resources
-- Event-Driven Ansible controller enabled in AAP
-- AAP API credential for EDA to trigger job templates
-- ServiceNow credential (from `snow` demo)
-- Splunk Enterprise instance deployed (from `splunk` demo)
-- RHEL 9 client with Universal Forwarder (from `splunk` demo)
+### Required External Configuration
 
-### Required Configuration
-- Splunk Enterprise must be configured to send webhook events to EDA event stream
-- EDA event stream must have valid authentication token
-- ServiceNow instance must be accessible from AAP
+The following configuration changes must be made in Splunk Enterprise:
+
+* Install the "Red Hat Event Driven Ansible Add-on For Splunk" (requires login to splunk.com)
+* Add an integration for the EDA Add-on for Splunk
+  * Name: eda_splunk
+  * Integration type: Webhook
+  * Environment: eda_demo
+  * Webhook endpoint: use endpoint from the "Splunk Events" event stream in AAP
+  * Webhook Auth Type: API Key in Header
+  * Authentication Token: token value from the "Splunk API token" EDA credential in AAP
+* Configure an alert to forward events to EDA
+  * Search pattern: `index=main process=useradd UID=*`
+  * Title: RHEL Useradd
+  * Permissions: Shared in App
+  * Alert Type: Real-time
+  * Trigger alert when: Per-Result
+  * Trigger Action: Ansible Action
+    * Integration Type: Webhook
+    * Environment: eda_demo
+    * Send All Results: Plaintext
 
 ## Installation
+
+Review the [splunk](../splunk/README.md) and [snow](../snow/README.md) installation procedures for their installation requirements.
 
 ### 1. Install Prerequisites
 ```bash
@@ -124,13 +137,6 @@ Or use the **APD Extras | Install extra demo** job template with:
    - Audit trail in ServiceNow
    - No manual intervention required
 
-### Optional Extensions
-
-1. **Test Different Events**: Modify the rulebook to trigger on different Splunk events
-2. **Add Enrichment**: Show how to pull additional data from other systems
-3. **Scale Discussion**: Explain how this pattern applies to production security operations
-4. **Compliance**: Discuss how automated incident creation supports compliance requirements
-
 ## Architecture
 
 ### Event Flow
@@ -196,8 +202,3 @@ Or use the **APD Extras | Install extra demo** job template with:
 - Confirm syslog events are being generated
 - Review Splunk indexer receiving port (9997)
 
-## References
-
-- [Event-Driven Ansible Documentation](https://ansible.readthedocs.io/projects/rulebook/)
-- [Splunk Webhook Alert Actions](https://docs.splunk.com/Documentation/Splunk/latest/Alert/Webhooks)
-- [ServiceNow Incident Management](https://docs.servicenow.com/bundle/washingtondc-it-service-management/page/product/incident-management/)
