@@ -1,6 +1,8 @@
-# Splunk Enterprise Demo
+# Splunk Enterprise Deployment Demo
 
 This demo deploys Splunk Enterprise on an AWS EC2 instance and demonstrates automated installation and configuration of enterprise log management infrastructure.
+
+For Event-Driven Ansible integration with Splunk and ServiceNow, see the `eda_splunk_snow` demo.
 
 ## Overview
 
@@ -52,11 +54,11 @@ Or configure in the "Splunk Admin" credential in AAP after demo installation.
 ### Install the Demo
 
 Run the **APD Extras | Install extra demo** job template with:
-- **demo**: `eda_splunk`
+- **demo**: `splunk`
 
 Or using ansible-navigator:
 ```bash
-ansible-navigator run -m stdout playbooks/install-demo.yml -e demo=eda_splunk
+ansible-navigator run -m stdout playbooks/install-demo.yml -e demo=splunk
 ```
 
 ## Usage
@@ -144,6 +146,12 @@ After successful installation:
 **Recommendation**: Terminate the EC2 instances when not in use to avoid ongoing charges.
 
 ## Extending the Demo
+
+### Event-Driven Ansible Integration
+See the **eda_splunk_snow** demo for an example of integrating Splunk with Event-Driven Ansible and ServiceNow:
+- Automated incident creation when Splunk detects security events
+- Webhook integration between Splunk and EDA
+- Enriched ServiceNow incidents with Splunk event data
 
 ### Adding Forwarders
 Create additional job templates to:

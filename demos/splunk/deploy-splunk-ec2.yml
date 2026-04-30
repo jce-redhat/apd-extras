@@ -96,7 +96,30 @@
         wait: true
       register: _splunk_instance
 
-    - name: Allocate Elastic IP for Splunk instance
+    - name: Get list of all Elastic IPs in region
+      amazon.aws.ec2_eip_info:
+        region: "{{ _aws_region }}"
+        filters:
+          domain: vpc
+      register: _all_eips
+
+    - name: Find unassociated Elastic IPs
+      ansible.builtin.set_fact:
+        _available_eips: "{{ _all_eips.addresses | selectattr('association_id', 'undefined') | list }}"
+
+    - name: Reuse available Elastic IP if one exists
+      amazon.aws.ec2_eip:
+        region: "{{ _aws_region }}"
+        device_id: "{{ _splunk_instance.instances[0].instance_id }}"
+        public_ip: "{{ _available_eips[0].public_ip }}"
+        in_vpc: true
+        allow_reassociation: false
+        tags:
+          Name: "{{ _instance_name }}"
+      register: _eip
+      when: _available_eips | length > 0
+
+    - name: Allocate new Elastic IP if none available
       amazon.aws.ec2_eip:
         region: "{{ _aws_region }}"
         device_id: "{{ _splunk_instance.instances[0].instance_id }}"
@@ -104,7 +127,12 @@
         release_on_disassociation: true
         tags:
           Name: "{{ _instance_name }}"
-      register: _eip
+      register: _eip_new
+      when: _available_eips | length == 0
+
+    - name: Set EIP fact for consistent variable reference
+      ansible.builtin.set_fact:
+        _eip: "{{ _eip if _available_eips | length > 0 else _eip_new }}"
 
     - name: Wait for SSH to become available
       ansible.builtin.wait_for:
@@ -120,6 +148,7 @@
           - "Splunk instance created: {{ _instance_name }}"
           - "Elastic IP: {{ _eip.public_ip }}"
           - "Instance ID: {{ _splunk_instance.instances[0].instance_id }}"
+          - "EIP reused: {{ _available_eips | length > 0 }}"
 
 ...
 # vim: ft=yaml.ansible

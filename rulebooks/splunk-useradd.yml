@@ -9,7 +9,7 @@
       condition: event.payload.results.process == "useradd"
       action:
         run_job_template:
-          name: 'SNOW | Create incident from Splunk event'
+          name: 'EDA Demo | Create incident from Splunk event'
           organization: 'Ansible Product Demos (APD)'
           job_args:
             extra_vars:

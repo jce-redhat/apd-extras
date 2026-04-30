@@ -50,7 +50,7 @@ controller_templates:
     credentials:
       - AWS
     project: APD Extras
-    playbook: demos/eda_splunk/deploy-splunk-ec2.yml
+    playbook: demos/splunk/deploy-splunk-ec2.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -106,7 +106,7 @@ controller_templates:
       - AWS
       - APD Machine Credential
     project: APD Extras
-    playbook: demos/eda_splunk/configure-haproxy.yml
+    playbook: demos/splunk/configure-haproxy.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -127,7 +127,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/eda_splunk/install-splunk.yml
+    playbook: demos/splunk/install-splunk.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -153,7 +153,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/eda_splunk/configure-splunk.yml
+    playbook: demos/splunk/configure-splunk.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -182,7 +182,7 @@ controller_templates:
       - APD Machine Credential
       - Splunk Enterprise Admin
     project: APD Extras
-    playbook: demos/eda_splunk/install-forwarder.yml
+    playbook: demos/splunk/install-forwarder.yml
     execution_environment: Splunk Demo EE
     survey_enabled: true
     survey:
@@ -205,31 +205,6 @@ controller_templates:
           variable: splunk_forwarder_download_url
           required: true
           type: text
-
-  - name: Splunk | Add user to Splunk RHEL client
-    job_type: run
-    inventory: Ansible Product Demos Inventory
-    credentials:
-      - APD Machine Credential
-    project: APD Extras
-    playbook: demos/eda_splunk/add-new-user.yml
-    execution_environment: Product Demos EE
-    survey_enabled: true
-    survey:
-      name: ''
-      description: ''
-      spec:
-        - question_name: Splunk client instance name
-          variable: target_hosts
-          required: true
-          type: text
-          default: apd-splunk-client
-        - question_name: New user name
-          description: Username for new account
-          variable: new_account_username
-          required: true
-          type: text
-          default: demouser
 
 controller_workflows:
   - name: Deploy Splunk Enterprise in AWS
@@ -352,59 +327,6 @@ controller_workflows:
         unified_job_template: SUBMIT FEEDBACK
         extra_data:
           feedback: Failed to create AWS VPC
-
-eda_credentials:
-  - name: AAP Credential for EDA
-    description: Credential allowing rulebook activations to connect to the automation controller
-    state: present
-    credential_type: Red Hat Ansible Automation Platform
-    organization: Ansible Product Demos (APD)
-    inputs:
-      # Note: API path required in AAP 2.5+ for AAP credential used by EDA
-      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}/api/controller'
-      username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
-      password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
-      oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
-      verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
-
-  - name: Splunk API token
-    description: Token credential for Splunk to authenticate webhook calls to EDA event stream
-    state: present
-    credential_type: Token Event Stream
-    organization: Ansible Product Demos (APD)
-    inputs:
-      token: '{{ lookup("env","SPLUNK_EDA_TOKEN") | default("CHANGEME-EDA-Demo", true) }}'
-
-eda_projects:
-  - name: APD Extras
-    description: Additional AAP resources for use with Ansible Product Demos
-    state: present
-    scm_url: https://github.com/jce-redhat/apd-extras.git
-    scm_branch: '{{ apd_extras_git_repo_branch | default("main") }}'
-    organization: Ansible Product Demos (APD)
-
-eda_event_streams:
-  - name: Splunk Events
-    state: present
-    organization: Ansible Product Demos (APD)
-    credential_name: Splunk API token
-    forward_events: true
-
-eda_rulebook_activations:
-  - name: Splunk Useradd to ServiceNow
-    description: Monitor user creation events from Splunk and create ServiceNow incidents
-    state: enabled
-    organization: Ansible Product Demos (APD)
-    project: APD Extras
-    rulebook: splunk-useradd.yml
-    decision_environment: Default Decision Environment
-    eda_credentials:
-      - AAP Credential for EDA
-    event_streams:
-      - event_stream: Splunk Events
-        source_name: Splunk Events  # must match the source name in the rulebook
-    restart_policy: on-failure
-    log_level: info
 
 ...
 # vim: ft=yaml.ansible
