@@ -1,5 +1,6 @@
 **/tmp
 **/env/
+**/.claude/
 **/vault*.yml
 
 **/ansible-navigator.log
