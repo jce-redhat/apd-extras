@@ -1,0 +1,66 @@
+---
+# TODO remove this once the specified tag is promoted to latest
+controller_execution_environments:
+  - name: Product Demos EE
+    image: quay.io/ansible-product-demos/apd-ee-25:20260603
+
+controller_templates:
+  - name: AWS | CloudTrail | Create monitoring infrastructure
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/cloudtrail_monitoring/create-monitoring-infrastructure.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: monitoring_aws_region
+          type: multiplechoice
+          required: true
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+
+        - question_name: CloudTrail S3 retention days
+          variable: cloudtrail_s3_retention_days
+          type: integer
+          required: true
+          default: 7
+          min: 1
+          max: 90
+
+        - question_name: Resource owner
+          variable: monitoring_resource_owner
+          type: text
+          required: true
+
+  - name: AWS | CloudTrail | Delete monitoring infrastructure
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - AWS
+    project: APD Extras
+    playbook: demos/cloudtrail_monitoring/delete-monitoring-infrastructure.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: AWS region
+          variable: monitoring_aws_region
+          type: multiplechoice
+          required: true
+          choices:
+            - us-east-1
+            - us-east-2
+            - us-west-1
+            - us-west-2
+
+...
+# vim: ft=yaml.ansible

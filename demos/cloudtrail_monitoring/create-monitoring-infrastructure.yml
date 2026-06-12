@@ -1,0 +1,197 @@
+---
+- name: Create CloudTrail monitoring infrastructure
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _aws_region: '{{ monitoring_aws_region | default("us-east-2") }}'
+    _s3_retention_days: '{{ cloudtrail_s3_retention_days | default(7) | int }}'
+    _resource_owner: '{{ monitoring_resource_owner | default("apd-extras") }}'
+
+    # Resource names - hardcoded for demo purposes
+    _trail_name: apd-cloudtrail-monitoring
+    _queue_name: apd-cloudtrail-queue
+    _rule_name: apd-cloudtrail-events
+
+    # Common tags
+    _common_tags:
+      Owner: '{{ _resource_owner }}'
+      Deployer: 'apd-extras-ansible'
+
+  tasks:
+    - name: Get AWS account ID
+      amazon.aws.aws_caller_info:
+      register: _caller_info
+
+    - name: Set S3 bucket name with account ID for global uniqueness
+      ansible.builtin.set_fact:
+        _bucket_name: 'apd-cloudtrail-logs-{{ _caller_info.account }}'
+    # S3 Bucket for CloudTrail logs
+    - name: Create S3 bucket for CloudTrail logs
+      amazon.aws.s3_bucket:
+        name: '{{ _bucket_name }}'
+        region: '{{ _aws_region }}'
+        state: present
+        tags: '{{ _common_tags }}'
+      register: _s3_bucket
+      retries: 3
+      delay: 10
+      until: _s3_bucket is succeeded
+
+    - name: Configure S3 lifecycle policy for log retention
+      community.aws.s3_lifecycle:
+        name: '{{ _bucket_name }}'
+        region: '{{ _aws_region }}'
+        rule_id: cloudtrail-log-retention
+        expiration_days: '{{ _s3_retention_days }}'
+        status: enabled
+        prefix: ''
+        state: present
+      register: _s3_lifecycle
+      retries: 3
+      delay: 10
+      until: _s3_lifecycle is succeeded
+
+    - name: Create S3 bucket policy for CloudTrail access
+      amazon.aws.s3_bucket:
+        name: '{{ _bucket_name }}'
+        state: present
+        region: '{{ _aws_region }}'
+        policy: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "AWSCloudTrailAclCheck",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudtrail.amazonaws.com"
+                },
+                "Action": "s3:GetBucketAcl",
+                "Resource": "arn:aws:s3:::{{ _bucket_name }}"
+              },
+              {
+                "Sid": "AWSCloudTrailWrite",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudtrail.amazonaws.com"
+                },
+                "Action": "s3:PutObject",
+                "Resource": "arn:aws:s3:::{{ _bucket_name }}/AWSLogs/{{ _caller_info.account }}/*",
+                "Condition": {
+                  "StringEquals": {
+                    "s3:x-amz-acl": "bucket-owner-full-control"
+                  }
+                }
+              }
+            ]
+          }
+      register: _s3_bucket_policy
+      retries: 3
+      delay: 10
+      until: _s3_bucket_policy is succeeded
+
+    # CloudTrail Trail
+    - name: Create CloudTrail trail
+      amazon.aws.cloudtrail:
+        name: '{{ _trail_name }}'
+        s3_bucket_name: '{{ _bucket_name }}'
+        region: '{{ _aws_region }}'
+        is_multi_region_trail: true
+        include_global_service_events: true
+        enable_logging: true
+        state: present
+        tags: '{{ _common_tags }}'
+      register: _cloudtrail
+      retries: 3
+      delay: 10
+      until: _cloudtrail is succeeded
+
+    # SQS Queue
+    - name: Create SQS queue for CloudTrail events
+      community.aws.sqs_queue:
+        name: '{{ _queue_name }}'
+        region: '{{ _aws_region }}'
+        message_retention_period: 345600  # 4 days in seconds
+        visibility_timeout: 300  # 5 minutes
+        tags: '{{ _common_tags }}'
+      register: _sqs_queue
+      retries: 3
+      delay: 10
+      until: _sqs_queue is succeeded
+
+    # EventBridge Rule and Target
+    - name: Create EventBridge rule for EC2 RunInstances events with SQS target
+      amazon.aws.cloudwatchevent_rule:
+        name: '{{ _rule_name }}'
+        region: '{{ _aws_region }}'
+        event_pattern: |
+          {
+            "source": ["aws.ec2"],
+            "detail-type": ["AWS API Call via CloudTrail"],
+            "detail": {
+              "eventName": ["RunInstances"],
+              "awsRegion": ["{{ _aws_region }}"]
+            }
+          }
+        state: present
+        targets:
+          - id: SendToSQS
+            arn: '{{ _sqs_queue.queue_arn }}'
+      register: _eventbridge_rule
+      retries: 3
+      delay: 10
+      until: _eventbridge_rule is succeeded
+
+    # SQS Queue Policy to allow EventBridge
+    - name: Update SQS queue policy to allow EventBridge
+      community.aws.sqs_queue:
+        name: '{{ _queue_name }}'
+        region: '{{ _aws_region }}'
+        policy: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "AllowEventBridgeToSendMessages",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "events.amazonaws.com"
+                },
+                "Action": "sqs:SendMessage",
+                "Resource": "{{ _sqs_queue.queue_arn }}",
+                "Condition": {
+                  "ArnEquals": {
+                    "aws:SourceArn": "{{ _eventbridge_rule.rule.arn }}"
+                  }
+                }
+              }
+            ]
+          }
+      register: _sqs_queue_policy
+      retries: 3
+      delay: 10
+      until: _sqs_queue_policy is succeeded
+
+    # Output results
+    - name: Display deployment results
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "CloudTrail Monitoring Infrastructure Created"
+          - "========================================="
+          - "Region: {{ _aws_region }}"
+          - "---"
+          - "S3 Bucket: {{ _bucket_name }}"
+          - "CloudTrail Trail: {{ _trail_name }}"
+          - "SQS Queue Name: {{ _queue_name }}"
+          - "SQS Queue URL: {{ _sqs_queue.queue_url }}"
+          - "EventBridge Rule: {{ _rule_name }}"
+          - "---"
+          - "To use with EDA, update your rulebook activation with:"
+          - "  sqs_queue_name: {{ _queue_name }}"
+          - "  aws_region: {{ _aws_region }}"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible

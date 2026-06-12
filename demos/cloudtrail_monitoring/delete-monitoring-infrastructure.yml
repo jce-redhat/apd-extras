@@ -1,0 +1,89 @@
+---
+- name: Delete CloudTrail monitoring infrastructure
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _aws_region: '{{ monitoring_aws_region }}'
+
+    # Resource names - hardcoded for demo purposes
+    _trail_name: apd-cloudtrail-monitoring
+    _queue_name: apd-cloudtrail-queue
+    _rule_name: apd-cloudtrail-events
+
+  tasks:
+    - name: Get AWS account ID
+      amazon.aws.aws_caller_info:
+      register: _caller_info
+
+    - name: Set S3 bucket name with account ID for global uniqueness
+      ansible.builtin.set_fact:
+        _bucket_name: 'apd-cloudtrail-logs-{{ _caller_info.account }}'
+    - name: Display resources to be deleted
+      ansible.builtin.debug:
+        msg:
+          - "WARNING: About to delete CloudTrail monitoring infrastructure"
+          - "Region: {{ _aws_region }}"
+          - "Resources to be deleted:"
+          - "  - S3 Bucket: {{ _bucket_name }}"
+          - "  - CloudTrail Trail: {{ _trail_name }}"
+          - "  - SQS Queue: {{ _queue_name }}"
+          - "  - EventBridge Rule: {{ _rule_name }}"
+
+    - name: Pause for confirmation
+      ansible.builtin.pause:
+        seconds: 10
+        prompt: "Deletion will begin in 10 seconds. Press Ctrl+C to abort."
+
+    - name: Delete EventBridge rule (targets deleted automatically)
+      amazon.aws.cloudwatchevent_rule:
+        name: '{{ _rule_name }}'
+        region: '{{ _aws_region }}'
+        state: absent
+
+    - name: Delete SQS queue
+      community.aws.sqs_queue:
+        name: '{{ _queue_name }}'
+        region: '{{ _aws_region }}'
+        state: absent
+
+    - name: Stop CloudTrail logging
+      amazon.aws.cloudtrail:
+        name: '{{ _trail_name }}'
+        region: '{{ _aws_region }}'
+        state: absent
+
+    - name: List objects in S3 bucket
+      amazon.aws.s3_object:
+        bucket: '{{ _bucket_name }}'
+        mode: list
+      register: _s3_objects
+      failed_when: false
+
+    - name: Delete all objects from S3 bucket
+      amazon.aws.s3_object:
+        bucket: '{{ _bucket_name }}'
+        object: '{{ item }}'
+        mode: delobj
+      loop: '{{ _s3_objects.s3_keys | default([]) }}'
+      when: _s3_objects.s3_keys is defined
+
+    - name: Delete S3 bucket
+      amazon.aws.s3_bucket:
+        name: '{{ _bucket_name }}'
+        region: '{{ _aws_region }}'
+        state: absent
+        force: true
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "CloudTrail Monitoring Infrastructure Deleted"
+          - "========================================="
+          - "Region: {{ _aws_region }}"
+          - "All resources have been removed"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible
