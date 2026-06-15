@@ -44,11 +44,6 @@ controller_credentials:
       password: '{{ lookup("env","INFOBLOX_PASSWORD") | default(vault_infoblox_password, true) }}'
       verify_ssl: '{{ lookup("env","INFOBLOX_SSL_VERIFY") }}'
 
-# TODO remove this once the specified tag is promoted to latest
-controller_execution_environments:
-  - name: Product Demos EE
-    image: quay.io/ansible-product-demos/apd-ee-25:20251216
-
 controller_templates:
   - name: Infoblox | AWS | Display available Infoblox AMIs
     job_type: run

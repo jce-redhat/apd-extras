@@ -39,11 +39,6 @@ controller_credentials:
       username: '{{ lookup("env","SN_USERNAME") | default("admin", true) }}'
       password: '{{ lookup("env","SN_PASSWORD") }}'
 
-# TODO remove this once the specified tag is promoted to latest
-controller_execution_environments:
-  - name: Product Demos EE
-    image: quay.io/ansible-product-demos/apd-ee-25:20260108
-
 controller_inventory_sources:
   - name: ServiceNow CMDB
     source: scm
