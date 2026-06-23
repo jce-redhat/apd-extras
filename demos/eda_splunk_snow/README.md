@@ -71,7 +71,6 @@ Or use the **APD Extras | Install extra demo** job template with:
 
 ### EDA Resources
 
-* **Credential**: `AAP Credential for EDA` - Allows rulebook activations to trigger AAP job templates
 * **Credential**: `Splunk API token` - Authenticates Splunk webhook calls to EDA event stream
 * **Event Stream**: `Splunk Events` - Receives webhook events from Splunk Enterprise
 * **Rulebook Activation**: `Splunk Useradd to ServiceNow` - Active rulebook monitoring for useradd events

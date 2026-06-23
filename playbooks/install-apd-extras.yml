@@ -40,6 +40,27 @@
                   variable: demo
                   required: true
                   type: text
+        eda_credentials:
+          - name: AAP Credential for EDA
+            description: Credential allowing rulebook activations to connect to the automation controller
+            state: present
+            credential_type: Red Hat Ansible Automation Platform
+            organization: Ansible Product Demos (APD)
+            inputs:
+              # Note: API path required in AAP 2.5+ for AAP credential used by EDA
+              host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}/api/controller'
+              username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
+              password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
+              oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
+              verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
+        eda_projects:
+          - name: APD Extras
+            description: Additional AAP resources for use with Ansible Product Demos
+            state: present
+            scm_url: '{{ apd_extras_git_repo }}'
+            scm_branch: '{{ apd_extras_git_repo_branch | default("main") }}'
+            organization: Ansible Product Demos (APD)
+            sync: true
 
 ...
 # vim: ft=yaml.ansible

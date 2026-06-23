@@ -121,19 +121,6 @@ controller_templates:
           default: demouser
 
 eda_credentials:
-  - name: AAP Credential for EDA
-    description: Credential allowing rulebook activations to connect to the automation controller
-    state: present
-    credential_type: Red Hat Ansible Automation Platform
-    organization: Ansible Product Demos (APD)
-    inputs:
-      # Note: API path required in AAP 2.5+ for AAP credential used by EDA
-      host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}/api/controller'
-      username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
-      password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
-      oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
-      verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
-
   - name: Splunk API token
     description: Token credential for Splunk to authenticate webhook calls to EDA event stream
     state: present
