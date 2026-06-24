@@ -1,0 +1,82 @@
+---
+eda_credential_types:
+  - name: Amazon Web Services
+    description: AWS credential for EDA
+    state: present
+    inputs:
+      fields:
+        - id: username
+          label: Access Key
+          type: string
+        - id: password
+          label: Secret Key
+          type: string
+          secret: true
+        - id: security_token
+          label: STS Token
+          type: string
+          secret: true
+          help_text: >-
+            Security Token Service (STS) is a web service that enables you to request
+            temporary, limited-privilege credentials for AWS Identity and Access
+            Management (IAM) users.
+      required:
+        - username
+        - password
+    injectors:
+      env:
+        AWS_ACCESS_KEY_ID: !unsafe '{{ username }}'
+        AWS_SECRET_ACCESS_KEY: !unsafe '{{ password }}'
+        AWS_SESSION_TOKEN: !unsafe '{{ security_token }}'
+
+eda_credentials:
+  - name: AWS
+    description: AWS credential for EDA rulebooks
+    state: present
+    credential_type: Amazon Web Services
+    organization: Ansible Product Demos (APD)
+    inputs:
+      username: '{{ lookup("env","AWS_ACCESS_KEY_ID") | default("CHANGEME", true) }}'
+      password: '{{ lookup("env","AWS_SECRET_ACCESS_KEY") | default("CHANGEME", true) }}'
+      security_token: '{{ lookup("env","AWS_SESSION_TOKEN") | default(omit) }}'
+
+controller_workflows:
+  - name: EDA | CloudTrail EC2 Fact Scan
+    description: Sync AWS inventory and run fact scan on new EC2 instance
+    organization: Ansible Product Demos (APD)
+    ask_variables_on_launch: true
+    simplified_workflow_nodes:
+      - identifier: Sync AWS Inventory
+        unified_job_template: AWS Inventory
+        success_nodes:
+          - Fact Scan
+      - identifier: Fact Scan
+        unified_job_template: LINUX | Fact Scan
+
+eda_projects:
+  - name: APD Extras
+    description: Additional AAP resources for use with Ansible Product Demos
+    state: present
+    scm_url: https://github.com/jce-redhat/apd-extras.git
+    scm_branch: '{{ apd_extras_git_repo_branch | default("main") }}'
+    organization: Ansible Product Demos (APD)
+
+eda_rulebook_activations:
+  - name: CloudTrail EC2 to Fact Scan
+    description: Monitor SQS queue for new EC2 instance events and run a fact scan
+    state: enabled
+    organization: Ansible Product Demos (APD)
+    project: APD Extras
+    rulebook: cloudtrail-ec2-sqs.yml
+    decision_environment: Default Decision Environment
+    eda_credentials:
+      - AAP Credential for EDA
+      - AWS
+    extra_vars:
+      sqs_queue_name: apd-cloudtrail-queue
+      sqs_queue_region: '{{ monitoring_aws_region | default("us-east-2") }}'
+    restart_policy: on-failure
+    log_level: info
+
+...
+# vim: ft=yaml.ansible

@@ -1,0 +1,23 @@
+---
+- name: Monitor SQS queue for EC2 RunInstances events
+  hosts: all
+  sources:
+    - name: CloudTrail EC2 Events
+      amazon.aws.aws_sqs_queue:
+        name: '{{ sqs_queue_name | default("apd-cloudtrail-queue") }}'
+        region: '{{ sqs_queue_region | default("us-east-2") }}'
+        delay_seconds: 10
+
+  rules:
+    - name: Run fact scan on new EC2 instance
+      condition: event.body.detail.eventName == "RunInstances"
+      action:
+        run_workflow_template:
+          name: EDA | CloudTrail EC2 Fact Scan
+          organization: Ansible Product Demos (APD)
+          job_args:
+            extra_vars:
+              _hosts: '{{ event.body.detail.requestParameters.tagSpecificationSet["items"][0].tags[0].value }}'
+
+...
+# vim: ft=yaml.ansible
