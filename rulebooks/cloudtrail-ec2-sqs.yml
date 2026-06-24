@@ -12,12 +12,14 @@
     - name: Run fact scan on new EC2 instance
       condition: event.body.detail.eventName == "RunInstances"
       action:
-        run_workflow_template:
-          name: EDA | CloudTrail EC2 Fact Scan
+        run_job_template:
+          name: EDA | EC2 Instance Fact Scan
           organization: Ansible Product Demos (APD)
           job_args:
             extra_vars:
-              _hosts: '{{ event.body.detail.requestParameters.tagSpecificationSet["items"][0].tags[0].value }}'
+              instance_id: '{{ event.body.detail.responseElements.instancesSet["items"][0].instanceId }}'
+              instance_name: '{{ event.body.detail.requestParameters.tagSpecificationSet["items"][0].tags[0].value }}'
+              aws_region: '{{ event.body.detail.awsRegion }}'
 
 ...
 # vim: ft=yaml.ansible

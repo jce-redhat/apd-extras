@@ -40,6 +40,19 @@ eda_credentials:
       password: '{{ lookup("env","AWS_SECRET_ACCESS_KEY") | default("CHANGEME", true) }}'
       security_token: '{{ lookup("env","AWS_SESSION_TOKEN") | default(omit) }}'
 
+controller_templates:
+  - name: EDA | EC2 Instance Fact Scan
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - APD Machine Credential
+      - AWS
+    project: APD Extras
+    playbook: demos/eda_cloudtrail_sqs/ec2-fact-scan.yml
+    ask_variables_on_launch: true
+    use_fact_cache: true
+    allow_simultaneous: true
+
 controller_workflows:
   - name: EDA | CloudTrail EC2 Fact Scan
     description: Sync AWS inventory and run fact scan on new EC2 instance

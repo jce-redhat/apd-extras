@@ -1,0 +1,35 @@
+---
+- name: Look up EC2 instance and add to inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Query EC2 instance information
+      amazon.aws.ec2_instance_info:
+        region: '{{ aws_region }}'
+        instance_ids:
+          - '{{ instance_id }}'
+      register: _instance_info
+
+    - name: Add instance to new_ec2_instances group
+      ansible.builtin.add_host:
+        name: '{{ instance_name }}'
+        groups: new_ec2_instances
+        ansible_host: '{{ _instance_info.instances[0].public_ip_address }}'
+        ansible_user: ec2-user
+
+- name: Gather facts on new EC2 instances
+  hosts: new_ec2_instances
+  gather_facts: false
+
+  tasks:
+    - name: Wait for instance to become reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+...
+# vim: ft=yaml.ansible
