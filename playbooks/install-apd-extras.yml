@@ -52,7 +52,22 @@
               username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
               password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
               oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
-              verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
+              verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(true) }}'
+          - name: registry.redhat.io
+            description: Container registry credential for registry.redhat.io
+            state: present
+            credential_type: Container Registry
+            organization: Ansible Product Demos (APD)
+            inputs:
+              host: registry.redhat.io
+              username: CHANGEME
+              password: CHANGEME
+        eda_decision_environments:
+          - name: APD Default DE
+            description: Default decision environment for Ansible Product Demos
+            organization: Ansible Product Demos (APD)
+            image_url: registry.redhat.io/ansible-automation-platform-26/de-supported-rhel9:latest
+            credential: registry.redhat.io
         eda_projects:
           - name: APD Extras
             description: Additional AAP resources for use with Ansible Product Demos

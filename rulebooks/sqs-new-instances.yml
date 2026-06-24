@@ -1,0 +1,29 @@
+---
+- name: Monitor SQS queue for EC2 RunInstances events
+  hosts: all
+  sources:
+    - name: CloudTrail EC2 Events
+      amazon.aws.aws_sqs_queue:
+        name: '{{ sqs_queue_name | default("apd-cloudtrail-queue") }}'
+        region: '{{ sqs_queue_region | default("us-east-2") }}'
+        delay_seconds: 10
+
+  rules:
+    - name: Run post-provisioning on new EC2 instances
+      condition: event.body.detail.eventName == "RunInstances"
+      throttle:
+        once_after: 1 minute
+        group_by_attributes:
+          # group by unique key so all events are retained
+          - event.body.detail.eventID
+      action:
+        run_job_template:
+          name: EDA | EC2 Instance Post-provisioning
+          organization: Ansible Product Demos (APD)
+          job_args:
+            extra_vars:
+              # handle single or multiple events within throttle window
+              instance_events: "{{ (events | default({})).values() | list or ([event] if event is defined else []) }}"
+
+...
+# vim: ft=yaml.ansible

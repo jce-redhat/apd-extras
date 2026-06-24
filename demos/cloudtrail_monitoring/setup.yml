@@ -1,9 +1,4 @@
 ---
-# TODO remove this once the specified tag is promoted to latest
-controller_execution_environments:
-  - name: Product Demos EE
-    image: quay.io/ansible-product-demos/apd-ee-25:20260603
-
 controller_templates:
   - name: AWS | CloudTrail | Create monitoring infrastructure
     job_type: run
