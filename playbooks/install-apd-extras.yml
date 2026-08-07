@@ -60,7 +60,6 @@
             scm_url: '{{ apd_extras_git_repo }}'
             scm_branch: '{{ apd_extras_git_repo_branch | default("main") }}'
             organization: Ansible Product Demos (APD)
-            sync: true
 
 ...
 # vim: ft=yaml.ansible

@@ -1,0 +1,61 @@
+---
+controller_templates:
+  - name: OpenShift | OPA | Deploy Open Policy Agent
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+      - AAP Credential
+    project: APD Extras
+    playbook: demos/opa/deploy-opa.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: OPA namespace
+          description: OpenShift project/namespace for the OPA deployment
+          variable: opa_namespace
+          required: true
+          type: text
+          default: opa
+
+        - question_name: OPA container image
+          variable: opa_image
+          required: true
+          type: text
+          default: docker.io/openpolicyagent/opa:latest-static
+
+  - name: OpenShift | OPA | Add Policy
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/opa/add-policy.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: OPA namespace
+          description: OpenShift project/namespace where OPA is deployed
+          variable: opa_namespace
+          required: true
+          type: text
+          default: opa
+
+        - question_name: Policy name
+          description: Unique identifier for the policy (e.g. aap_syntax_check)
+          variable: opa_policy_name
+          required: true
+          type: text
+
+        - question_name: Rego policy text
+          description: Rego policy code to upload to OPA
+          variable: opa_policy_text
+          required: true
+          type: textarea
+
+...
+# vim: ft=yaml.ansible
