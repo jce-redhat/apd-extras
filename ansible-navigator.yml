@@ -5,8 +5,7 @@ ansible-navigator:
     rotate-artifacts-count: 10
   execution-environment:
     container-engine: podman
-    # TODO switch back to "latest" tag when this tag is promoted
-    image: quay.io/ansible-product-demos/apd-ee-25:20260108
+    image: quay.io/ansible-product-demos/apd-ee-27:latest
     pull:
       policy: missing
     environment-variables:

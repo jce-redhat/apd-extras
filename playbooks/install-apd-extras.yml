@@ -6,9 +6,31 @@
   vars:
     apd_extras_git_repo: https://github.com/jce-redhat/apd-extras.git
     apd_extras_git_repo_branch: main
-    session_cookie_age: 3600
+    session_cookie_age: 7200
+
+    # version 2.7 of the ansible.platform collection broke environment variable fallback
+    # so these variables are set as a workaround
+    aap_hostname: '{{ lookup("env", "AAP_HOSTNAME") | regex_replace("/$", "") | default(omit, true) }}'
+    aap_username: '{{ lookup("env", "AAP_USERNAME") | default(omit, true) }}'
+    aap_password: '{{ lookup("env", "AAP_PASSWORD") | default(omit, true) }}'
+    aap_token: '{{ lookup("env", "AAP_TOKEN") | default("", true) }}'
+    aap_validate_certs: '{{ lookup("env", "AAP_VALIDATE_CERTS") | default(false, true) }}'
 
   tasks:
+    - name: Make sure AAP credential environment variables are set
+      ansible.builtin.assert:
+        that:
+          - aap_hostname is defined
+          - aap_token != "" or (aap_username is defined and aap_password is defined)
+        fail_msg: |
+          Please ensure the following environment variables are set:
+            export AAP_HOSTNAME=https://your-aap-server.example.com
+            # either a token for authentication
+            export AAP_TOKEN=<admin-token>
+            # or a username and password for basic auth
+            export AAP_USERNAME=admin  # or another user with AAP superuser privileges
+            export AAP_PASSWORD=<admin-user-password>
+
     - name: Install APD extras
       ansible.builtin.include_role:
         name: infra.aap_configuration.dispatch
@@ -48,11 +70,11 @@
             organization: Ansible Product Demos (APD)
             inputs:
               # Note: API path required in AAP 2.5+ for AAP credential used by EDA
-              host: '{{ lookup("env","AAP_HOSTNAME") | default("https://example.invalid") }}/api/controller'
-              username: '{{ lookup("env","AAP_USERNAME") | default(omit) }}'
-              password: '{{ lookup("env","AAP_PASSWORD") | default(omit) }}'
-              oauth_token: '{{ lookup("env","AAP_TOKEN") | default(omit) }}'
-              verify_ssl: '{{ lookup("env","AAP_VALIDATE_CERTS") | default(omit) }}'
+              host: '{{ aap_hostname }}/api/controller'
+              username: '{{ aap_username | default(omit) }}'
+              password: '{{ aap_password | default(omit) }}'
+              oauth_token: '{{ aap_token | default(omit) }}'
+              verify_ssl: '{{ aap_validate_certs | default(omit) }}'
         eda_projects:
           - name: APD Extras
             description: Additional AAP resources for use with Ansible Product Demos
