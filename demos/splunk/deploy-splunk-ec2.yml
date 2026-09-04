@@ -86,6 +86,8 @@
           Name: "{{ _instance_name }}"
           owner: "{{ _instance_owner }}"
           splunk_role: standalone
+          managed-by: aap-product-demos
+          apd: "true"
         vpc_subnet_id: "{{ _subnet_id }}"
         volumes:
           - device_name: /dev/sda1
