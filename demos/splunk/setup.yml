@@ -244,12 +244,12 @@ controller_workflows:
             - t3.large
             - t3.xlarge
           default: t3.medium
-        - question_name: RHEL 9 instance name
+        - question_name: Splunk client instance name
           type: text
           variable: create_vm_vm_name
           required: true
           default: apd-splunk-client
-        - question_name: RHEL 9 instance type
+        - question_name: Splunk client instance type
           type: multiplechoice
           variable: create_vm_aws_instance_size
           required: true
