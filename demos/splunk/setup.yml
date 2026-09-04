@@ -66,6 +66,7 @@ controller_templates:
             - us-east-2
             - us-west-1
             - us-west-2
+          default: us-east-2
         - question_name: AWS VPC name
           description: Existing VPC where the Splunk security group will be created
           variable: splunk_vpc_name
@@ -224,13 +225,10 @@ controller_workflows:
             - us-east-2
             - us-west-1
             - us-west-2
+          default: us-east-2
         - question_name: AWS resource owner
           type: text
           variable: create_vm_aws_owner_tag
-          required: true
-        - question_name: AWS keypair public key content
-          type: textarea
-          variable: aws_public_key
           required: true
         - question_name: Splunk instance name
           type: text
@@ -275,14 +273,14 @@ controller_workflows:
         unified_job_template: Cloud | AWS | Create Keypair
         success_nodes:
           - Create Splunk instance
-          - Create RHEL9 instance
+          - Create Splunk client instance
         failure_nodes:
           - Ticket - Keypair Failed
       - identifier: Create VPC
         unified_job_template: Cloud | AWS | Create VPC
         success_nodes:
           - Create Splunk instance
-          - Create RHEL9 instance
+          - Create Splunk client instance
         failure_nodes:
           - Ticket - VPC Failed
       - identifier: Ticket - Keypair Failed
@@ -294,7 +292,7 @@ controller_workflows:
         all_parents_must_converge: true
         success_nodes:
           - Inventory Sync
-      - identifier: Create RHEL9 instance
+      - identifier: Create Splunk client instance
         unified_job_template: Cloud | AWS | Create VM
         all_parents_must_converge: true
         extra_data:

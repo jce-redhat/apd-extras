@@ -38,7 +38,7 @@ This demo requires the following resources from Ansible Product Demos:
 ### Credentials
 Set the Splunk admin password before installation:
 ```bash
-export SPLUNK_ADMIN_PASSWORD='YourSecurePassword123!'
+export SPLUNK_PASSWORD='YourSecurePassword123!'
 ```
 
 Or configure in the "Splunk Admin" credential in AAP after demo installation but before running the Splunk deployment workflow.
@@ -85,5 +85,5 @@ After successful installation:
 2. Access Splunk Web: `https://<elastic-ip>/`
 3. Login with:
    - **Username**: `admin`
-   - **Password**: Value of `SPLUNK_ADMIN_PASSWORD` environment variable
+   - **Password**: Value of `SPLUNK_PASSWORD` environment variable
 
