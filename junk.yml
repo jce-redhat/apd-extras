@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Display inventory_dir and playbook_dir
+      ansible.builtin.debug:
+        msg:
+          - "inventory_dir is: {{ inventory_dir }}"
+          - "playbook_dir is: {{ playbook_dir }}"
