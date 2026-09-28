@@ -9,4 +9,13 @@
           - "inventory_dir is: {{ inventory_dir }}"
           - "playbook_dir is: {{ playbook_dir }}"
 
+    - name: Get content of /runner/project
+      ansible.builtin.command: >
+        ls -l /runner/project
+      register: _project_dir
+
+    - name: Get content of /runner/project
+      ansible.builtin.debug:
+        var: _project_dir
+
 ...
