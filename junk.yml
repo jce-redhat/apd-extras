@@ -28,4 +28,13 @@
       ansible.builtin.debug:
         var: _inventory_dir
 
+    - name: Get content of /runner/inventory/hosts
+      ansible.builtin.command: >
+        cat /runner/inventory/hosts
+      register: _hosts_file
+
+    - name: Display content of /runner/inventory/hosts
+      ansible.builtin.debug:
+        var: _hosts_file
+
 ...
