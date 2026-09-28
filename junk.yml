@@ -1,5 +1,7 @@
 ---
-- hosts: localhost
+- name: Magic vars test
+  hosts: bogus
+  connection: local
   gather_facts: false
   tasks:
     - name: Display inventory_dir and playbook_dir
@@ -7,3 +9,5 @@
         msg:
           - "inventory_dir is: {{ inventory_dir }}"
           - "playbook_dir is: {{ playbook_dir }}"
+
+...
