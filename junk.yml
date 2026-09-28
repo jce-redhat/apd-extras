@@ -1,7 +1,6 @@
 ---
 - name: Magic vars test
-  hosts: bogus
-  connection: local
+  hosts: localhost
   gather_facts: false
   tasks:
     - name: Display inventory_dir and playbook_dir
