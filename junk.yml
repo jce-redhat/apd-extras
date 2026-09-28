@@ -14,8 +14,17 @@
         ls -l /runner/project
       register: _project_dir
 
-    - name: Get content of /runner/project
+    - name: Display content of /runner/project
       ansible.builtin.debug:
         var: _project_dir
+
+    - name: Get content of /runner/inventory
+      ansible.builtin.command: >
+        ls -l /runner/inventory
+      register: _inventory_dir
+
+    - name: Display content of /runner/inventory
+      ansible.builtin.debug:
+        var: _inventory_dir
 
 ...
