@@ -1,0 +1,77 @@
+---
+- name: Delete Splunk Operator from OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _remove_crds: true
+    _operator_namespace: openshift-operators
+
+  tasks:
+    - name: Get current Subscription to find installed CSV name
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        name: splunk-operator
+        namespace: '{{ _operator_namespace }}'
+      register: _sub
+
+    - name: Set installed CSV name fact
+      ansible.builtin.set_fact:
+        _csv_name: '{{ _sub.resources[0].status.installedCSV | default("") }}'
+      when: _sub.resources | length > 0
+
+    - name: Delete the Subscription
+      kubernetes.core.k8s:
+        state: absent
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        name: splunk-operator
+        namespace: '{{ _operator_namespace }}'
+
+    - name: Delete the ClusterServiceVersion
+      kubernetes.core.k8s:
+        state: absent
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        name: '{{ _csv_name }}'
+        namespace: '{{ _operator_namespace }}'
+      when: _csv_name | default('') | length > 0
+
+    - name: Find Splunk CRDs
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+      register: _all_crds
+      when: _remove_crds
+
+    - name: Set Splunk CRD list fact
+      ansible.builtin.set_fact:
+        _splunk_crds: >-
+          {{ _all_crds.resources |
+             selectattr('metadata.name', 'match', '.*\\.enterprise\\.splunk\\.com$') |
+             map(attribute='metadata.name') | list }}
+      when: _remove_crds
+
+    - name: Delete Splunk CRDs
+      kubernetes.core.k8s:
+        state: absent
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: '{{ item }}'
+      loop: '{{ _splunk_crds | default([]) }}'
+      when: _remove_crds
+
+    - name: Display completion
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Splunk Operator Removed"
+          - "========================================="
+          - "Subscription deleted: splunk-operator"
+          - "CSV deleted: {{ _csv_name | default('N/A') }}"
+          - "CRDs removed: {{ _remove_crds }}"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible

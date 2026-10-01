@@ -1,0 +1,91 @@
+---
+- name: Install Splunk Operator on OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _channel: '{{ splunk_operator_channel | default("stable") }}'
+    _operator_namespace: openshift-operators
+
+  tasks:
+    - name: Check if Splunk Operator subscription already exists
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        name: splunk-operator
+        namespace: '{{ _operator_namespace }}'
+      register: _existing_sub
+
+    - name: Apply OLM Subscription for Splunk Operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: splunk-operator
+            namespace: '{{ _operator_namespace }}'
+          spec:
+            channel: '{{ _channel }}'
+            name: splunk-operator
+            source: certified-operators
+            sourceNamespace: openshift-marketplace
+            installPlanApproval: Automatic
+            config:
+              env:
+                - name: SPLUNK_GENERAL_TERMS
+                  value: '--accept-sgt-current-at-splunk-com'
+
+    - name: Wait for Splunk Operator deployment to reflect updated env
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: splunk-operator-controller-manager
+        namespace: '{{ _operator_namespace }}'
+      register: _operator_deploy
+      retries: 18
+      delay: 10
+      until: >
+        _operator_deploy.resources | length > 0 and
+        (_operator_deploy.resources[0].spec.template.spec.containers[0].env |
+         selectattr('name', 'equalto', 'SPLUNK_GENERAL_TERMS') |
+         selectattr('value', 'equalto', '--accept-sgt-current-at-splunk-com') |
+         list | length) > 0 and
+        (_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
+
+    - name: Wait for Splunk Operator CSV to reach Succeeded phase
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: '{{ _operator_namespace }}'
+      register: _csv_list
+      retries: 30
+      delay: 10
+      until: >
+        _csv_list.resources |
+        selectattr('metadata.name', 'match', '^splunk-operator\\.v.*') |
+        selectattr('status.phase', 'defined') |
+        selectattr('status.phase', 'equalto', 'Succeeded') |
+        list | length > 0
+
+    - name: Set installed CSV name fact
+      ansible.builtin.set_fact:
+        _installed_csv: >-
+          {{ (_csv_list.resources |
+              selectattr('metadata.name', 'match', '^splunk-operator\.v.*') |
+              selectattr('status.phase', 'equalto', 'Succeeded') |
+              list | first).metadata.name }}
+
+    - name: Display installation results
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Splunk Operator Installed Successfully"
+          - "========================================="
+          - "Namespace: {{ _operator_namespace }}"
+          - "Channel: {{ _channel }}"
+          - "CSV: {{ _installed_csv }}"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible

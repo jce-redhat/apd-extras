@@ -73,6 +73,69 @@ controller_templates:
     execution_environment: Product Demos EE
     survey_enabled: false
 
+  - name: Infra | Splunk | Install Splunk Operator
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/infra/install-splunk-operator.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Operator channel
+          variable: splunk_operator_channel
+          required: true
+          type: multiplechoice
+          choices:
+            - stable
+          default: stable
+
+  - name: Infra | Splunk | Deploy Splunk instance
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+      - AAP Credential
+    project: APD Extras
+    playbook: demos/infra/deploy-splunk.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+  - name: Infra | Splunk | Delete Splunk instance
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/infra/delete-splunk.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+  - name: Infra | Splunk | Delete Splunk Operator
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/infra/delete-splunk-operator.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
   - name: Infra | Infoblox | Display available Infoblox AMIs
     labels:
       - infrastructure
@@ -179,6 +242,36 @@ controller_templates:
           default: apd-infoblox
 
 controller_workflows:
+  - name: Infra | Splunk | Deploy Splunk on OpenShift
+    description: Install the Splunk Operator and deploy a standalone Splunk instance
+    labels:
+      - infrastructure
+      - openshift
+    organization: Ansible Product Demos (APD)
+    survey_enabled: false
+    simplified_workflow_nodes:
+      - identifier: Install Operator
+        unified_job_template: Infra | Splunk | Install Splunk Operator
+        success_nodes:
+          - Deploy Splunk Instance
+      - identifier: Deploy Splunk Instance
+        unified_job_template: Infra | Splunk | Deploy Splunk instance
+
+  - name: Infra | Splunk | Delete Splunk from OpenShift
+    description: Remove the Splunk instance and optionally uninstall the operator
+    labels:
+      - infrastructure
+      - openshift
+    organization: Ansible Product Demos (APD)
+    survey_enabled: false
+    simplified_workflow_nodes:
+      - identifier: Delete Splunk Instance
+        unified_job_template: Infra | Splunk | Delete Splunk instance
+        success_nodes:
+          - Delete Operator
+      - identifier: Delete Operator
+        unified_job_template: Infra | Splunk | Delete Splunk Operator
+
   - name: Infra | Infoblox | Deploy Infoblox instance in AWS
     description: Deploy an Infoblox virtual appliance in AWS
     labels:

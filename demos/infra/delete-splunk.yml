@@ -1,0 +1,61 @@
+---
+- name: Delete Splunk standalone instance
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: 'apd-splunk'
+    _instance_name: 's1'
+    _delete_namespace: true
+
+  tasks:
+    - name: Display resources to be deleted
+      ansible.builtin.debug:
+        msg:
+          - "WARNING: About to delete Splunk instance"
+          - "Namespace: {{ _namespace }}"
+          - "Instance: {{ _instance_name }}"
+          - "Delete namespace: {{ _delete_namespace }}"
+
+    - name: Delete the Splunk Web Route
+      kubernetes.core.k8s:
+        state: absent
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: '{{ _instance_name }}-splunk-web'
+        namespace: '{{ _namespace }}'
+      ignore_errors: true
+
+    - name: Delete the Standalone CR
+      kubernetes.core.k8s:
+        state: absent
+        api_version: enterprise.splunk.com/v4
+        kind: Standalone
+        name: '{{ _instance_name }}'
+        namespace: '{{ _namespace }}'
+        wait: true
+        wait_timeout: 300
+
+    - name: Delete the namespace
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: '{{ _namespace }}'
+        wait: true
+        wait_timeout: 300
+      when: _delete_namespace
+
+    - name: Display completion
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Splunk Instance Deleted"
+          - "========================================="
+          - "Instance: {{ _instance_name }}"
+          - "Namespace: {{ _namespace }}"
+          - "Namespace deleted: {{ _delete_namespace }}"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible

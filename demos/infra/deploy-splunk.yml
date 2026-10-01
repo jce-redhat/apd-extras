@@ -1,0 +1,194 @@
+---
+- name: Deploy Splunk standalone instance using the Splunk Operator
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: 'apd-splunk'
+    _instance_name: 's1'
+    _storage_size: '20Gi'
+    _admin_password: '{{ aap_password }}'
+
+  tasks:
+    - name: Ensure AAP Credential is attached and aap_password is set
+      ansible.builtin.assert:
+        that:
+          - aap_password is defined and aap_password | length > 0
+        fail_msg: >
+          The AAP Credential must be attached to this job template so that
+          aap_password is available to set the Splunk admin password.
+
+    - name: Verify Splunk Operator Standalone CRD is available
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: standalones.enterprise.splunk.com
+      register: _crd
+      failed_when: _crd.resources | length == 0
+
+    - name: Create target namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: '{{ _namespace }}'
+            labels:
+              app.kubernetes.io/managed-by: apd-extras
+
+    - name: Check if Standalone CR is stuck in Terminating state
+      kubernetes.core.k8s_info:
+        api_version: enterprise.splunk.com/v4
+        kind: Standalone
+        name: '{{ _instance_name }}'
+        namespace: '{{ _namespace }}'
+      register: _cr_check
+
+    - name: Remove finalizer from terminating Standalone CR
+      kubernetes.core.k8s:
+        state: patched
+        api_version: enterprise.splunk.com/v4
+        kind: Standalone
+        name: '{{ _instance_name }}'
+        namespace: '{{ _namespace }}'
+        definition:
+          metadata:
+            finalizers: []
+      when:
+        - _cr_check.resources | length > 0
+        - _cr_check.resources[0].metadata.deletionTimestamp is defined
+
+    - name: Wait for terminating Standalone CR to be fully gone
+      kubernetes.core.k8s_info:
+        api_version: enterprise.splunk.com/v4
+        kind: Standalone
+        name: '{{ _instance_name }}'
+        namespace: '{{ _namespace }}'
+      register: _cr_gone
+      retries: 12
+      delay: 5
+      until: _cr_gone.resources | length == 0
+      when:
+        - _cr_check.resources | length > 0
+        - _cr_check.resources[0].metadata.deletionTimestamp is defined
+
+    - name: Grant nonroot-v2 SCC to default service account in Splunk namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: 'splunk-{{ _namespace }}-default-nonroot-v2'
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: 'system:openshift:scc:nonroot-v2'
+          subjects:
+            - kind: ServiceAccount
+              name: default
+              namespace: '{{ _namespace }}'
+
+    - name: Create global Splunk namespace secret with admin password
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: 'splunk-{{ _namespace }}-secret'
+            namespace: '{{ _namespace }}'
+          stringData:
+            password: '{{ _admin_password }}'
+
+    - name: Deploy Splunk Standalone CR
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: enterprise.splunk.com/v4
+          kind: Standalone
+          metadata:
+            name: '{{ _instance_name }}'
+            namespace: '{{ _namespace }}'
+            finalizers:
+              - enterprise.splunk.com/delete-pvc
+          spec:
+            replicas: 1
+            etcVolumeStorageConfig:
+              storageCapacity: '{{ _storage_size }}'
+            varVolumeStorageConfig:
+              storageCapacity: '{{ _storage_size }}'
+
+    - name: Wait for Splunk Standalone pod to be running
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: '{{ _namespace }}'
+        label_selectors:
+          - 'app.kubernetes.io/instance=splunk-{{ _instance_name }}-standalone'
+      register: _pods
+      retries: 20
+      delay: 15
+      until: >
+        _pods.resources | length > 0 and
+        (_pods.resources | selectattr('status.phase', 'defined') |
+         selectattr('status.phase', 'equalto', 'Running') | list | length) > 0
+
+    - name: Wait for Splunk Standalone CR to reach Ready phase
+      kubernetes.core.k8s_info:
+        api_version: enterprise.splunk.com/v4
+        kind: Standalone
+        name: '{{ _instance_name }}'
+        namespace: '{{ _namespace }}'
+      register: _standalone
+      retries: 20
+      delay: 15
+      until: >
+        _standalone.resources | length > 0 and
+        _standalone.resources[0].status.phase | default('') == 'Ready'
+
+    - name: Create Route for Splunk Web UI
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: '{{ _instance_name }}-splunk-web'
+            namespace: '{{ _namespace }}'
+          spec:
+            to:
+              kind: Service
+              name: 'splunk-{{ _instance_name }}-standalone-service'
+            port:
+              targetPort: http-splunkweb
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Get Route hostname
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: '{{ _instance_name }}-splunk-web'
+        namespace: '{{ _namespace }}'
+      register: _route
+
+    - name: Display deployment results
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Splunk Standalone Instance Deployed"
+          - "========================================="
+          - "Namespace: {{ _namespace }}"
+          - "Instance: {{ _instance_name }}"
+          - "Phase: {{ _standalone.resources[0].status.phase }}"
+          - "---"
+          - "Splunk Web URL: https://{{ _route.resources[0].spec.host }}"
+          - "Username: admin"
+          - "Password: (same as AAP admin password)"
+          - "========================================="
+
+...
+# vim: ft=yaml.ansible

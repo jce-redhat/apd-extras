@@ -24,3 +24,4 @@ ansible-navigator run -m stdout playbooks/install-demo.yml -e demo=infra
 |---|---|
 | [Grafana](README-Grafana.md) | Grafana dashboards for OpenShift cluster and AAP resource metrics |
 | [Infoblox](README-Infoblox.md) | Infoblox virtual appliance deployed in AWS for DNS/DHCP/IPAM demos |
+| [Splunk](README-Splunk.md) | Splunk Enterprise deployed on OpenShift via the Splunk Operator |
