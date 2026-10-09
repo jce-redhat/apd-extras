@@ -150,6 +150,11 @@
                 admin_password: '{{ _admin_password }}'
               log:
                 mode: console
+            route:
+              spec:
+                tls:
+                  termination: edge
+                  insecureEdgeTerminationPolicy: Redirect
             deployment:
               spec:
                 template:
@@ -371,30 +376,11 @@
                 ]
               }
 
-    - name: Create Grafana Route
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: route.openshift.io/v1
-          kind: Route
-          metadata:
-            name: apd-grafana
-            namespace: '{{ _namespace }}'
-          spec:
-            to:
-              kind: Service
-              name: apd-grafana-service
-            port:
-              targetPort: grafana
-            tls:
-              termination: edge
-              insecureEdgeTerminationPolicy: Redirect
-
-    - name: Get Grafana route host
+    - name: Get Grafana route
       kubernetes.core.k8s_info:
         api_version: route.openshift.io/v1
         kind: Route
-        name: apd-grafana
+        name: apd-grafana-route
         namespace: '{{ _namespace }}'
       register: _route
       until: >

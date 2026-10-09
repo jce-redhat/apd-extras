@@ -31,14 +31,6 @@
         namespace: '{{ _namespace }}'
         name: apd-grafana
 
-    - name: Remove Grafana Route
-      kubernetes.core.k8s:
-        state: absent
-        api_version: route.openshift.io/v1
-        kind: Route
-        namespace: '{{ _namespace }}'
-        name: apd-grafana
-
     - name: Remove Prometheus ClusterRoleBinding
       kubernetes.core.k8s:
         state: absent
