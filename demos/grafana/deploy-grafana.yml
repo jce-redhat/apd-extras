@@ -11,6 +11,17 @@
     _thanos_url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
 
   tasks:
+    - name: Get cluster ingress domain
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: _cluster_ingress
+
+    - name: Set Grafana root URL
+      ansible.builtin.set_fact:
+        _grafana_root_url: 'https://apd-grafana-route-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}'
+
     - name: Create Grafana namespace
       kubernetes.core.k8s:
         state: present
@@ -145,6 +156,8 @@
               dashboards: apd-grafana
           spec:
             config:
+              server:
+                root_url: '{{ _grafana_root_url }}'
               security:
                 admin_user: admin
                 admin_password: '{{ _admin_password }}'
@@ -172,31 +185,6 @@
                         volumeMounts:
                           - name: grafana-data
                             mountPath: /var/lib/grafana
-
-    - name: Wait for Grafana Route to be created
-      kubernetes.core.k8s_info:
-        api_version: route.openshift.io/v1
-        kind: Route
-        namespace: '{{ _namespace }}'
-      register: _route
-      until: >
-        _route.resources | length > 0 and
-        (_route.resources[0].status.ingress | default([]) | length > 0)
-      retries: 15
-      delay: 5
-
-    - name: Patch Grafana instance with root URL from actual Route
-      kubernetes.core.k8s:
-        state: patched
-        api_version: grafana.integreatly.org/v1beta1
-        kind: Grafana
-        name: apd-grafana
-        namespace: '{{ _namespace }}'
-        definition:
-          spec:
-            config:
-              server:
-                root_url: 'https://{{ _route.resources[0].spec.host }}'
 
     - name: Wait for Grafana deployment to be ready
       kubernetes.core.k8s_info:
@@ -250,7 +238,7 @@
             instanceSelector:
               matchLabels:
                 dashboards: apd-grafana
-            json: "{{ lookup('file', 'dashboards/openshift-cluster-overview.json') | to_json }}"
+            json: "{{ lookup('template', 'dashboards/openshift-cluster-overview.json') }}"
 
     - name: Display Grafana access information
       ansible.builtin.debug:
@@ -258,7 +246,7 @@
           - "======================================="
           - "Grafana deployed successfully!"
           - "======================================="
-          - "URL: https://{{ _route.resources[0].spec.host }}"
+          - "URL: {{ _grafana_root_url }}"
           - "Username: admin"
           - "Password: (as configured in survey)"
           - "======================================="
