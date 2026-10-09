@@ -351,7 +351,7 @@
                     "type": "stat",
                     "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
                     "datasource": {"type": "prometheus"},
-                    "targets": [{"expr": "count(kube_node_status_condition{condition=\"Ready\",status!=\"true\"}) or vector(0)", "legendFormat": "Not Ready"}],
+                    "targets": [{"expr": "count(kube_node_info) - count(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) or vector(0)", "legendFormat": "Not Ready"}],
                     "fieldConfig": {
                       "defaults": {
                         "thresholds": {
