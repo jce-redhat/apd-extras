@@ -1,0 +1,403 @@
+---
+- name: Deploy Grafana on OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: '{{ grafana_namespace | default("grafana") }}'
+    _admin_password: '{{ grafana_admin_password | default("changeme") }}'
+    _storage_size: '{{ grafana_storage_size | default("1Gi") }}'
+    _storage_class: ocs-external-storagecluster-ceph-rbd
+    _thanos_url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+
+  tasks:
+    - name: Create Grafana namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: '{{ _namespace }}'
+
+    - name: Create PVC for Grafana data
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: grafana-data-pvc
+            namespace: '{{ _namespace }}'
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: '{{ _storage_size }}'
+            storageClassName: '{{ _storage_class }}'
+
+    - name: Create OperatorGroup for grafana-operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: grafana-operator-group
+            namespace: '{{ _namespace }}'
+          spec:
+            targetNamespaces:
+              - '{{ _namespace }}'
+
+    - name: Subscribe to grafana-operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: grafana-operator
+            namespace: '{{ _namespace }}'
+          spec:
+            channel: v5
+            installPlanApproval: Automatic
+            name: grafana-operator
+            source: community-operators
+            sourceNamespace: openshift-marketplace
+
+    - name: Wait for grafana-operator CSV to succeed
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: '{{ _namespace }}'
+      register: _csvs
+      until: >
+        _csvs.resources | length > 0 and
+        _csvs.resources | selectattr('status.phase', 'defined') |
+        selectattr('status.phase', 'equalto', 'Succeeded') | list | length > 0
+      retries: 30
+      delay: 10
+
+    - name: Create ServiceAccount for Prometheus access
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: grafana-prometheus-sa
+            namespace: '{{ _namespace }}'
+
+    - name: Bind cluster-monitoring-view to Grafana SA
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: grafana-prometheus-view
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-monitoring-view
+          subjects:
+            - kind: ServiceAccount
+              name: grafana-prometheus-sa
+              namespace: '{{ _namespace }}'
+
+    - name: Create long-lived token secret for Grafana SA
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: grafana-prometheus-token
+            namespace: '{{ _namespace }}'
+            annotations:
+              kubernetes.io/service-account.name: grafana-prometheus-sa
+          type: kubernetes.io/service-account-token
+
+    - name: Wait for token to be populated
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        name: grafana-prometheus-token
+        namespace: '{{ _namespace }}'
+      register: _token_secret
+      until: >
+        _token_secret.resources | length > 0 and
+        'token' in (_token_secret.resources[0].data | default({}))
+      retries: 15
+      delay: 5
+
+    - name: Deploy Grafana instance
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: grafana.integreatly.org/v1beta1
+          kind: Grafana
+          metadata:
+            name: apd-grafana
+            namespace: '{{ _namespace }}'
+            labels:
+              dashboards: apd-grafana
+          spec:
+            config:
+              security:
+                admin_user: admin
+                admin_password: '{{ _admin_password }}'
+              log:
+                mode: console
+            deployment:
+              spec:
+                template:
+                  spec:
+                    volumes:
+                      - name: grafana-data
+                        persistentVolumeClaim:
+                          claimName: grafana-data-pvc
+                    containers:
+                      - name: grafana
+                        volumeMounts:
+                          - name: grafana-data
+                            mountPath: /var/lib/grafana
+            ingress:
+              enabled: true
+
+    - name: Wait for Grafana deployment to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: apd-grafana-deployment
+        namespace: '{{ _namespace }}'
+      register: _grafana_deploy
+      until: >
+        _grafana_deploy.resources | length > 0 and
+        (_grafana_deploy.resources[0].status.readyReplicas | default(0)) | int >= 1
+      retries: 30
+      delay: 10
+
+    - name: Create OpenShift Prometheus datasource
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: grafana.integreatly.org/v1beta1
+          kind: GrafanaDatasource
+          metadata:
+            name: openshift-prometheus
+            namespace: '{{ _namespace }}'
+          spec:
+            instanceSelector:
+              matchLabels:
+                dashboards: apd-grafana
+            datasource:
+              name: OpenShift Prometheus
+              type: prometheus
+              access: proxy
+              url: '{{ _thanos_url }}'
+              isDefault: true
+              jsonData:
+                timeInterval: 15s
+                tlsSkipVerify: true
+                httpHeaderName1: Authorization
+              secureJsonData:
+                httpHeaderValue1: 'Bearer {{ _token_secret.resources[0].data.token | b64decode }}'
+
+    - name: Deploy OpenShift cluster overview dashboard
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: grafana.integreatly.org/v1beta1
+          kind: GrafanaDashboard
+          metadata:
+            name: openshift-cluster-overview
+            namespace: '{{ _namespace }}'
+          spec:
+            instanceSelector:
+              matchLabels:
+                dashboards: apd-grafana
+            json: |
+              {
+                "title": "OpenShift Cluster Overview",
+                "uid": "ocp-cluster-overview",
+                "description": "Cluster-wide CPU, memory, pod, and node metrics from OpenShift Prometheus",
+                "refresh": "30s",
+                "schemaVersion": 38,
+                "tags": ["openshift", "cluster", "infrastructure"],
+                "time": {"from": "now-1h", "to": "now"},
+                "panels": [
+                  {
+                    "id": 1,
+                    "title": "Cluster CPU Usage",
+                    "type": "gauge",
+                    "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "round((1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100, 0.1)", "legendFormat": "CPU %"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 70},
+                            {"color": "red", "value": 85}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+                  },
+                  {
+                    "id": 2,
+                    "title": "Cluster Memory Usage",
+                    "type": "gauge",
+                    "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "round((1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100, 0.1)", "legendFormat": "Memory %"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 70},
+                            {"color": "red", "value": 85}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+                  },
+                  {
+                    "id": 3,
+                    "title": "Running Pods",
+                    "type": "stat",
+                    "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "count(kube_pod_status_phase{phase=\"Running\"})", "legendFormat": "Running"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "thresholds": {"steps": [{"color": "green", "value": null}]}
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+                  },
+                  {
+                    "id": 4,
+                    "title": "Ready Nodes",
+                    "type": "stat",
+                    "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "legendFormat": "Ready"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "thresholds": {"steps": [{"color": "green", "value": null}]}
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+                  },
+                  {
+                    "id": 5,
+                    "title": "Pods Not Running",
+                    "type": "stat",
+                    "gridPos": {"h": 4, "w": 6, "x": 12, "y": 4},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"}) or vector(0)", "legendFormat": "Not Running"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 1},
+                            {"color": "red", "value": 5}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+                  },
+                  {
+                    "id": 6,
+                    "title": "Not-Ready Nodes",
+                    "type": "stat",
+                    "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "count(kube_node_status_condition{condition=\"Ready\",status!=\"true\"}) or vector(0)", "legendFormat": "Not Ready"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 1},
+                            {"color": "red", "value": 2}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+                  },
+                  {
+                    "id": 7,
+                    "title": "CPU Usage Over Time",
+                    "type": "timeseries",
+                    "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100", "legendFormat": "CPU %"}],
+                    "fieldConfig": {
+                      "defaults": {"unit": "percent", "min": 0, "max": 100}
+                    },
+                    "options": {"tooltip": {"mode": "single"}}
+                  },
+                  {
+                    "id": 8,
+                    "title": "Memory Usage Over Time",
+                    "type": "timeseries",
+                    "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory %"}],
+                    "fieldConfig": {
+                      "defaults": {"unit": "percent", "min": 0, "max": 100}
+                    },
+                    "options": {"tooltip": {"mode": "single"}}
+                  }
+                ]
+              }
+
+    - name: Get Grafana route
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: '{{ _namespace }}'
+      register: _routes
+      until: >
+        _routes.resources | length > 0 and
+        (_routes.resources[0].status.ingress | default([]) | length > 0)
+      retries: 15
+      delay: 5
+
+    - name: Display Grafana access information
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Grafana deployed successfully!"
+          - "======================================="
+          - "URL: https://{{ _routes.resources[0].spec.host }}"
+          - "Username: admin"
+          - "Password: (as configured in survey)"
+          - "======================================="
+          - "Datasource: OpenShift Prometheus (Thanos Querier)"
+          - "Dashboard: OpenShift Cluster Overview"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible

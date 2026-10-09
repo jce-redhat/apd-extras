@@ -1,0 +1,60 @@
+---
+controller_templates:
+  - name: OpenShift | Grafana | Deploy Grafana
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/grafana/deploy-grafana.yml
+    execution_environment: Product Demos EE
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Grafana admin password
+          variable: grafana_admin_password
+          type: password
+          required: true
+
+        - question_name: Grafana namespace
+          description: OpenShift namespace to deploy Grafana into
+          variable: grafana_namespace
+          type: text
+          required: false
+          default: grafana
+
+        - question_name: Storage size
+          description: PVC size for Grafana data persistence
+          variable: grafana_storage_size
+          type: multiplechoice
+          required: false
+          choices:
+            - 1Gi
+            - 5Gi
+            - 10Gi
+          default: 1Gi
+
+  - name: OpenShift | Grafana | Remove Grafana
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/grafana/delete-grafana.yml
+    execution_environment: Product Demos EE
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Grafana namespace
+          description: OpenShift namespace where Grafana is deployed
+          variable: grafana_namespace
+          type: text
+          required: false
+          default: grafana
+
+...
+# vim: ft=yaml.ansible

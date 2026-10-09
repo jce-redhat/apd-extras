@@ -1,0 +1,93 @@
+---
+- name: Remove Grafana from OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: '{{ grafana_namespace | default("grafana") }}'
+
+  tasks:
+    - name: Remove GrafanaDashboard CRs
+      kubernetes.core.k8s:
+        state: absent
+        api_version: grafana.integreatly.org/v1beta1
+        kind: GrafanaDashboard
+        namespace: '{{ _namespace }}'
+        name: openshift-cluster-overview
+
+    - name: Remove GrafanaDatasource CRs
+      kubernetes.core.k8s:
+        state: absent
+        api_version: grafana.integreatly.org/v1beta1
+        kind: GrafanaDatasource
+        namespace: '{{ _namespace }}'
+        name: openshift-prometheus
+
+    - name: Remove Grafana CR
+      kubernetes.core.k8s:
+        state: absent
+        api_version: grafana.integreatly.org/v1beta1
+        kind: Grafana
+        namespace: '{{ _namespace }}'
+        name: apd-grafana
+
+    - name: Remove Prometheus ClusterRoleBinding
+      kubernetes.core.k8s:
+        state: absent
+        api_version: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        name: grafana-prometheus-view
+
+    - name: Remove grafana-operator Subscription
+      kubernetes.core.k8s:
+        state: absent
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        namespace: '{{ _namespace }}'
+        name: grafana-operator
+
+    - name: Find grafana-operator CSV
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: '{{ _namespace }}'
+      register: _csvs
+
+    - name: Remove grafana-operator CSVs
+      kubernetes.core.k8s:
+        state: absent
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: '{{ _namespace }}'
+        name: '{{ item.metadata.name }}'
+      loop: '{{ _csvs.resources | selectattr("metadata.name", "search", "grafana") | list }}'
+      loop_control:
+        label: '{{ item.metadata.name }}'
+
+    - name: Delete Grafana namespace
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: '{{ _namespace }}'
+
+    - name: Wait for namespace to be fully removed
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: '{{ _namespace }}'
+      register: _ns
+      until: _ns.resources | length == 0
+      retries: 30
+      delay: 10
+
+    - name: Display removal results
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Grafana removed successfully"
+          - "Namespace '{{ _namespace }}' deleted"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible
