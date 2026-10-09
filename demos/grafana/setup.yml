@@ -23,7 +23,7 @@ controller_templates:
           variable: grafana_namespace
           type: text
           required: false
-          default: grafana
+          default: apd-grafana
 
         - question_name: Storage size
           description: PVC size for Grafana data persistence
@@ -54,7 +54,7 @@ controller_templates:
           variable: grafana_namespace
           type: text
           required: false
-          default: grafana
+          default: apd-grafana
 
 ...
 # vim: ft=yaml.ansible

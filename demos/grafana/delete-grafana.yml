@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    _namespace: '{{ grafana_namespace | default("grafana") }}'
+    _namespace: '{{ grafana_namespace | default("apd-grafana") }}'
 
   tasks:
     - name: Remove GrafanaDashboard CRs

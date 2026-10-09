@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    _namespace: '{{ grafana_namespace | default("grafana") }}'
+    _namespace: '{{ grafana_namespace | default("apd-grafana") }}'
     _admin_password: '{{ grafana_admin_password | default("changeme") }}'
     _storage_size: '{{ grafana_storage_size | default("1Gi") }}'
     _storage_class: ocs-external-storagecluster-ceph-rbd
