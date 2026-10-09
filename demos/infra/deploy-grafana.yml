@@ -1,0 +1,369 @@
+---
+- name: Deploy Grafana on OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # values are hardcoded for APD catalog item in RHDP.  admin password defaults to the
+    # AAP admin password set in the AAP credential attached to the job template
+    _namespace: 'apd-grafana'
+    _admin_password: '{{ aap_password | default("changeme") }}'
+    _storage_size: '1Gi'
+    _storage_class: ocs-external-storagecluster-ceph-rbd
+    _thanos_url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+    _aap_namespace: 'aap'
+    _dashboards:
+      - openshift-cluster-overview
+      - aap-resources
+
+  tasks:
+    - name: Get cluster ingress domain
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: _cluster_ingress
+
+    - name: Enable OpenShift user workload monitoring
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: cluster-monitoring-config
+            namespace: openshift-monitoring
+          data:
+            config.yaml: |
+              enableUserWorkload: true
+
+    - name: Wait for user workload monitoring Prometheus to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: StatefulSet
+        name: prometheus-user-workload
+        namespace: openshift-user-workload-monitoring
+      register: _uwm_sts
+      until: >
+        _uwm_sts.resources | length > 0 and
+        (_uwm_sts.resources[0].status.readyReplicas | default(0)) | int >= 1
+      retries: 30
+      delay: 10
+
+    - name: Check if AAP metrics token secret already exists
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        name: aap-metrics-token
+        namespace: '{{ _aap_namespace }}'
+      register: _existing_metrics_secret
+
+    - name: Create AAP monitoring token for Prometheus
+      ansible.builtin.uri:
+        url: '{{ lookup("env", "AAP_HOSTNAME") }}/api/gateway/v1/tokens/'
+        method: POST
+        url_username: '{{ lookup("env", "AAP_USERNAME") }}'
+        url_password: '{{ lookup("env", "AAP_PASSWORD") }}'
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          description: grafana-prometheus-metrics
+          scope: read
+        status_code: 201
+      register: _aap_token_response
+      when: _existing_metrics_secret.resources | length == 0
+
+    - name: Create AAP metrics token secret for Prometheus
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: aap-metrics-token
+            namespace: '{{ _aap_namespace }}'
+          type: Opaque
+          stringData:
+            token: '{{ _aap_token_response.json.token }}'
+            token_id: '{{ _aap_token_response.json.id | string }}'
+      when: _existing_metrics_secret.resources | length == 0
+
+    - name: Create ServiceMonitor for AAP controller metrics
+      kubernetes.core.k8s:
+        state: present
+        apply: true
+        definition:
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          metadata:
+            name: aap-controller-metrics
+            namespace: '{{ _aap_namespace }}'
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: aap
+                app.kubernetes.io/component: aap
+            endpoints:
+              - port: http
+                path: /api/controller/v2/metrics/
+                scheme: http
+                interval: 30s
+                bearerTokenSecret:
+                  name: aap-metrics-token
+                  key: token
+
+    - name: Create Grafana namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: '{{ _namespace }}'
+
+    - name: Create PVC for Grafana data
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: grafana-data-pvc
+            namespace: '{{ _namespace }}'
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: '{{ _storage_size }}'
+            storageClassName: '{{ _storage_class }}'
+
+    - name: Create OperatorGroup for grafana-operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: grafana-operator-group
+            namespace: '{{ _namespace }}'
+          spec:
+            targetNamespaces:
+              - '{{ _namespace }}'
+
+    - name: Subscribe to grafana-operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: grafana-operator
+            namespace: '{{ _namespace }}'
+          spec:
+            channel: v5
+            installPlanApproval: Automatic
+            name: grafana-operator
+            source: community-operators
+            sourceNamespace: openshift-marketplace
+
+    - name: Wait for grafana-operator CSV to succeed
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: '{{ _namespace }}'
+      register: _csvs
+      until: >
+        _csvs.resources | length > 0 and
+        _csvs.resources | selectattr('status.phase', 'defined') |
+        selectattr('status.phase', 'equalto', 'Succeeded') | list | length > 0
+      retries: 30
+      delay: 10
+
+    - name: Create ServiceAccount for Prometheus access
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: grafana-prometheus-sa
+            namespace: '{{ _namespace }}'
+
+    - name: Bind cluster-monitoring-view to Grafana SA
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: grafana-prometheus-view
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-monitoring-view
+          subjects:
+            - kind: ServiceAccount
+              name: grafana-prometheus-sa
+              namespace: '{{ _namespace }}'
+
+    - name: Create long-lived token secret for Grafana SA
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: grafana-prometheus-token
+            namespace: '{{ _namespace }}'
+            annotations:
+              kubernetes.io/service-account.name: grafana-prometheus-sa
+          type: kubernetes.io/service-account-token
+
+    - name: Wait for token to be populated
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        name: grafana-prometheus-token
+        namespace: '{{ _namespace }}'
+      register: _token_secret
+      until: >
+        _token_secret.resources | length > 0 and
+        'token' in (_token_secret.resources[0].data | default({}))
+      retries: 15
+      delay: 5
+
+    # Grafana operator uses this pattern for the route name, and we want to use it in
+    # the spec at deployment time rather than deploying an instance, querying the route,
+    # then patching the instance
+    - name: Set Grafana root URL
+      ansible.builtin.set_fact:
+        _grafana_root_url: 'https://{{ _namespace }}-route-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}'
+
+    - name: Deploy Grafana instance
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: grafana.integreatly.org/v1beta1
+          kind: Grafana
+          metadata:
+            name: '{{ _namespace }}'
+            namespace: '{{ _namespace }}'
+            labels:
+              dashboards: '{{ _namespace }}'
+          spec:
+            config:
+              server:
+                root_url: '{{ _grafana_root_url }}'
+              security:
+                admin_user: admin
+                admin_password: '{{ _admin_password }}'
+                cookie_secure: "true"
+              feature_toggles:
+                improvedExternalSessionHandling: "false"
+                useSessionStorageForRedirection: "false"
+              log:
+                mode: console
+            route:
+              spec:
+                tls:
+                  termination: edge
+                  insecureEdgeTerminationPolicy: Redirect
+            deployment:
+              spec:
+                template:
+                  spec:
+                    volumes:
+                      - name: grafana-data
+                        persistentVolumeClaim:
+                          claimName: grafana-data-pvc
+                    containers:
+                      - name: grafana
+                        volumeMounts:
+                          - name: grafana-data
+                            mountPath: /var/lib/grafana
+
+    - name: Wait for Grafana deployment to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: '{{ _namespace }}-deployment'
+        namespace: '{{ _namespace }}'
+      register: _grafana_deploy
+      until: >
+        _grafana_deploy.resources | length > 0 and
+        (_grafana_deploy.resources[0].status.readyReplicas | default(0)) | int >= 1
+      retries: 30
+      delay: 10
+
+    - name: Wait for Grafana operator to successfully authenticate
+      kubernetes.core.k8s_info:
+        api_version: grafana.integreatly.org/v1beta1
+        kind: Grafana
+        name: '{{ _namespace }}'
+        namespace: '{{ _namespace }}'
+      register: _grafana_cr_status
+      until: >
+        _grafana_cr_status.resources | length > 0 and
+        (_grafana_cr_status.resources[0].status.stageStatus | default('')) == 'success'
+      retries: 30
+      delay: 10
+
+    - name: Create OpenShift Prometheus datasource
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: grafana.integreatly.org/v1beta1
+          kind: GrafanaDatasource
+          metadata:
+            name: openshift-prometheus
+            namespace: '{{ _namespace }}'
+          spec:
+            instanceSelector:
+              matchLabels:
+                dashboards: '{{ _namespace }}'
+            datasource:
+              name: OpenShift Prometheus
+              type: prometheus
+              access: proxy
+              url: '{{ _thanos_url }}'
+              isDefault: true
+              jsonData:
+                timeInterval: 15s
+                tlsSkipVerify: true
+                httpHeaderName1: Authorization
+              secureJsonData:
+                httpHeaderValue1: 'Bearer {{ _token_secret.resources[0].data.token | b64decode }}'
+
+    - name: Render dashboard CRs
+      ansible.builtin.template:
+        src: 'dashboards/{{ item }}-cr.yaml.j2'
+        dest: '/tmp/grafana-dashboard-{{ item }}.yaml'
+      loop: '{{ _dashboards }}'
+
+    - name: Deploy dashboards
+      kubernetes.core.k8s:
+        state: present
+        apply: true
+        src: '/tmp/grafana-dashboard-{{ item }}.yaml'
+      loop: '{{ _dashboards }}'
+
+    - name: Display Grafana access information
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Grafana deployed successfully!"
+          - "======================================="
+          - "URL: {{ _grafana_root_url }}"
+          - "Username: admin"
+          - "Password: (same as AAP admin password)"
+          - "======================================="
+          - "Datasource: OpenShift Prometheus (Thanos Querier)"
+          - "Dashboards:"
+          - "  - OpenShift Cluster Overview"
+          - "  - AAP Resources"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible

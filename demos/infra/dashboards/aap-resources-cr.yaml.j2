@@ -1,0 +1,12 @@
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: aap-resources
+  namespace: {{ _namespace }}
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ _namespace }}
+  json: |
+{{ lookup('file', 'dashboards/aap-resources.json') | indent(4, first=True) }}

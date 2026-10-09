@@ -1,0 +1,227 @@
+{
+  "title": "OpenShift Cluster Overview",
+  "uid": "ocp-cluster-overview",
+  "description": "Cluster-wide CPU, memory, pod, and node metrics from OpenShift Prometheus",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["openshift", "cluster", "infrastructure"],
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cluster CPU Usage",
+      "description": "Percentage of CPU cores currently in use across all nodes, averaged over a 5-minute window to smooth short spikes. Yellow at 70%, red at 85%.",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100, 0.1)", "legendFormat": "CPU %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 2,
+      "title": "Cluster Memory Usage",
+      "description": "Percentage of total RAM in use across all nodes, derived from the Linux kernel's MemAvailable and MemTotal counters. Yellow at 70%, red at 85%.",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100, 0.1)", "legendFormat": "Memory %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 3,
+      "title": "Running Pods",
+      "description": "Count of pods currently in the Running phase. Use as a baseline alongside 'Pods Not Running' to understand overall workload health.",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_pod_status_phase{phase=\"Running\"} == 1)", "legendFormat": "Running"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 4,
+      "title": "Ready Nodes",
+      "description": "Number of nodes with the Ready condition set to true. On a single-node cluster this should always be 1 — any lower value means the node itself is unhealthy.",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "legendFormat": "Ready"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 5,
+      "title": "Pods Not Running",
+      "description": "Pods in Pending, Failed, or Unknown phase. Succeeded is excluded as it is a normal terminal state. Any non-zero value here warrants investigation.",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 4},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"} == 1) or vector(0)", "legendFormat": "Not Running"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 5}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 6,
+      "title": "Not-Ready Nodes",
+      "description": "Nodes that exist but are not Ready, computed as total nodes minus Ready nodes. This catches nodes that have lost their Ready condition rather than simply not reporting one.",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_node_info) - count(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) or vector(0)", "legendFormat": "Not Ready"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 7,
+      "title": "CPU Usage Over Time",
+      "description": "Trend of cluster-wide CPU utilization over the selected time range. Useful for identifying sustained load, periodic spikes, or gradual resource pressure building over time.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100", "legendFormat": "CPU %"}],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 8,
+      "title": "Memory Usage Over Time",
+      "description": "Trend of cluster-wide memory utilization. Memory rarely spikes dramatically — a slow, steady upward trend is an early warning that the cluster is approaching its limits.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory %"}],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 9,
+      "title": "Cluster PVC Storage Usage",
+      "description": "Aggregate percentage of provisioned PVC capacity in use across all mounted volumes. Sourced from kubelet volume stats, so only reflects PVCs actively mounted by running pods.",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round(sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100, 0.1)", "legendFormat": "PVC Used %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 10,
+      "title": "Node /var Disk Usage",
+      "description": "Disk usage on the node's /var partition, where RHCOS stores container images, kubelet data, and logs. This filling up triggers pod eviction and node disk pressure conditions.",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100, 0.1)", "legendFormat": "Disk Used %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 11,
+      "title": "Storage Usage Over Time",
+      "description": "Combined trend of cluster PVC utilization and node /var disk usage. Useful for projecting when either storage pool will need attention before it becomes a problem.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {"expr": "sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100", "legendFormat": "Cluster PVC %"},
+        {"expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100", "legendFormat": "Node /var %"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    }
+  ]
+}

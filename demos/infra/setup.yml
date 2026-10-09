@@ -1,0 +1,32 @@
+---
+controller_templates:
+  - name: Infra | Grafana | Deploy Grafana on OpenShift
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+      - AAP Credential
+    project: APD Extras
+    playbook: demos/infra/deploy-grafana.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+  - name: Infra | Grafana | Remove Grafana from OpenShift
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+      - AAP Credential
+    project: APD Extras
+    playbook: demos/infra/delete-grafana.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+...
+# vim: ft=yaml.ansible

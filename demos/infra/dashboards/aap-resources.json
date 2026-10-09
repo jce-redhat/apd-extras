@@ -1,0 +1,438 @@
+{
+  "title": "AAP Resources",
+  "uid": "aap-resources",
+  "description": "Ansible Automation Platform job activity, resource inventory, and instance capacity metrics",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["ansible", "aap", "automation"],
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Running Jobs",
+      "description": "Jobs currently executing on the AAP controller. A sustained high count relative to instance capacity may indicate resource pressure or stuck jobs that are not completing.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_running_jobs_total", "legendFormat": "Running"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 5},
+              {"color": "red", "value": 20}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 2,
+      "title": "Pending Jobs",
+      "description": "Jobs submitted but not yet started. Persistent pending jobs indicate that instance capacity is exhausted or the task scheduler is not dispatching work — check Instance Capacity panels below.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_pending_jobs_total", "legendFormat": "Pending"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 30}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 3,
+      "title": "Job Success Rate",
+      "description": "Percentage of completed jobs (excluding active states) that succeeded. This is the primary signal for overall automation health — a drop here warrants immediate investigation of which templates are failing.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(awx_status_total{status=\"successful\"}) / sum(awx_status_total{status!=\"running\",status!=\"waiting\",status!=\"pending\"}) * 100",
+          "legendFormat": "Success Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 80},
+              {"color": "green", "value": 95}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 4,
+      "title": "Failed / Errored Jobs",
+      "description": "Cumulative count of jobs that ended in failed or error status since AAP started. Unlike success rate, this counter never resets, making it useful for tracking absolute failure volume over time.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "sum(awx_status_total{status=~\"failed|error\"})", "legendFormat": "Failed/Error"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 5,
+      "title": "Job Templates",
+      "description": "Total number of job templates defined in AAP. A reference count for understanding the breadth of automation being managed on this controller.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_job_templates_total", "legendFormat": "Job Templates"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 6,
+      "title": "Workflow Templates",
+      "description": "Total number of workflow job templates defined in AAP. Workflows chain multiple job templates together — a high count relative to job templates indicates a mature, orchestrated automation environment.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 4, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_workflow_job_templates_total", "legendFormat": "Workflow Templates"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 7,
+      "title": "Projects",
+      "description": "Total number of projects (SCM-backed playbook sources) configured in AAP. Each project maps to a git repository — this count reflects how many distinct codebases are under automation management.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 8, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_projects_total", "legendFormat": "Projects"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 8,
+      "title": "Managed Hosts",
+      "description": "Total number of hosts across all AAP inventories. Reflects the scope of infrastructure under automation management and counts toward the license entitlement.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 12, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_hosts_total{type=\"all\"}", "legendFormat": "Hosts"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 20,
+      "title": "License Hosts Used",
+      "description": "Percentage of the AAP license's managed host entitlement currently consumed. Approaching 100% means new hosts cannot be brought under automation until the license is expanded or unused hosts are removed.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "(awx_license_instance_total - awx_license_instance_free) / awx_license_instance_total * 100",
+          "legendFormat": "License Used %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 90}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 21,
+      "title": "DB Connections",
+      "description": "Active database connections from the AAP controller to PostgreSQL. A sudden spike or sustained high count can indicate connection pool exhaustion or slow queries degrading overall platform performance.",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 5},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "awx_database_connections_total", "legendFormat": "Connections"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 50},
+              {"color": "red", "value": 100}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 9,
+      "title": "Instance Capacity Used %",
+      "description": "Current fork consumption as a percentage of total capacity per controller node. Forks are the unit of parallelism in AAP — at 100% the scheduler queues all new jobs until running jobs complete.",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "awx_instance_consumed_capacity / awx_instance_capacity * 100",
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 90}
+            ]
+          }
+        }
+      },
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}, "displayMode": "gradient", "showUnfilled": true}
+    },
+    {
+      "id": 10,
+      "title": "Instance Remaining Capacity",
+      "description": "Raw remaining fork capacity per controller node. Shows how much headroom exists before the scheduler begins queueing jobs. Low values here explain a growing Pending Jobs count.",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "awx_instance_remaining_capacity",
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "green", "value": 50}
+            ]
+          }
+        }
+      },
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}, "displayMode": "gradient", "showUnfilled": true}
+    },
+    {
+      "id": 11,
+      "title": "Running & Pending Jobs Over Time",
+      "description": "Trend of active and queued job counts over time. A growing Pending line with a flat or declining Running line is the clearest signal of a capacity or scheduling bottleneck.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 18},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {"expr": "awx_running_jobs_total", "legendFormat": "Running"},
+        {"expr": "awx_pending_jobs_total", "legendFormat": "Pending"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Running"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Pending"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          }
+        ]
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 22,
+      "title": "Job Completions Per 5m",
+      "description": "Rate of jobs reaching a terminal state (successful, failed, error, canceled) over 5-minute windows. Lets you see failure spikes in context — a surge in red alongside steady green means something broke, not that the platform slowed down.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 14, "x": 0, "y": 26},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {"expr": "increase(awx_status_total{status=\"successful\"}[5m])", "legendFormat": "Successful"},
+        {"expr": "increase(awx_status_total{status=\"failed\"}[5m])", "legendFormat": "Failed"},
+        {"expr": "increase(awx_status_total{status=\"error\"}[5m])", "legendFormat": "Error"},
+        {"expr": "increase(awx_status_total{status=\"canceled\"}[5m])", "legendFormat": "Canceled"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Successful"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Failed"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Error"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Canceled"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          }
+        ]
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 23,
+      "title": "Launch Type Breakdown",
+      "description": "Distribution of how jobs are triggered: manually by a user, via a schedule, through a webhook, or by another job. A high manual proportion suggests opportunities for further automation via schedules or event-driven triggers.",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 10, "x": 14, "y": 26},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (launch_type) (awx_instance_launch_type_total)",
+          "legendFormat": "{{launch_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "pieType": "donut",
+        "tooltip": {"mode": "multi"},
+        "legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}
+      }
+    },
+    {
+      "id": 24,
+      "title": "Capacity Utilization Over Time",
+      "description": "Trend of fork consumption as a percentage of total capacity per controller node. Distinguishes transient peaks (a burst of jobs) from sustained overload that would require scaling the controller.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 14, "x": 0, "y": 34},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "awx_instance_consumed_capacity / awx_instance_capacity * 100",
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {"lineWidth": 2, "fillOpacity": 10},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 90}
+            ]
+          }
+        }
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 25,
+      "title": "Callback Event Queue Depth",
+      "description": "Number of job output events waiting in Redis before being written to the database. A queue that grows and does not drain means the callback receiver is falling behind, which can cause job output to appear delayed or be lost entirely.",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 10, "x": 14, "y": 34},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {
+          "expr": "callback_receiver_events_queue_size_redis",
+          "legendFormat": "{{node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {"lineWidth": 2, "fillOpacity": 10},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 100},
+              {"color": "red", "value": 500}
+            ]
+          }
+        }
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    }
+  ]
+}

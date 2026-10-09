@@ -3,6 +3,7 @@
 The following demos are available:
 
 * **eda_simple**: Basic demonstration of Event Driven Ansible that uses the ansible.eda.check\_url plugin to monitor a web URL and restart the web service when it becomes unavailable
+* **infra**: Deploy common infrastructure components for use by other demos
 * **eda_splunk_snow**: Event-Driven Ansible integration demo showing automated incident creation in ServiceNow when Splunk detects user account creation events
 * **infoblox**: Demonstrate Ansible integration with an Infoblox appliance for automating DNS, DHCP, and IPAM functions
 * **snow**: Demonstrate updating ServiceNow CMDB records and using the CMDB as a dynamic inventory source
