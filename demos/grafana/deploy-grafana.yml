@@ -163,8 +163,6 @@
                         volumeMounts:
                           - name: grafana-data
                             mountPath: /var/lib/grafana
-            ingress:
-              enabled: true
 
     - name: Wait for Grafana deployment to be ready
       kubernetes.core.k8s_info:
@@ -373,16 +371,36 @@
                 ]
               }
 
-    - name: Get Grafana route
+    - name: Create Grafana Route
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: apd-grafana
+            namespace: '{{ _namespace }}'
+          spec:
+            to:
+              kind: Service
+              name: apd-grafana-service
+            port:
+              targetPort: grafana
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Get Grafana route host
       kubernetes.core.k8s_info:
         api_version: route.openshift.io/v1
         kind: Route
+        name: apd-grafana
         namespace: '{{ _namespace }}'
-      register: _routes
+      register: _route
       until: >
-        _routes.resources | length > 0 and
-        (_routes.resources[0].status.ingress | default([]) | length > 0)
-      retries: 15
+        _route.resources | length > 0 and
+        (_route.resources[0].status.ingress | default([]) | length > 0)
+      retries: 10
       delay: 5
 
     - name: Display Grafana access information
@@ -391,7 +409,7 @@
           - "======================================="
           - "Grafana deployed successfully!"
           - "======================================="
-          - "URL: https://{{ _routes.resources[0].spec.host }}"
+          - "URL: https://{{ _route.resources[0].spec.host }}"
           - "Username: admin"
           - "Password: (as configured in survey)"
           - "======================================="
