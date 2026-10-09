@@ -238,7 +238,7 @@
             instanceSelector:
               matchLabels:
                 dashboards: apd-grafana
-            json: "{{ lookup('template', 'templates/openshift-cluster-overview.json.j2') }}"
+            json: "{{ lookup('file', 'templates/openshift-cluster-overview.json') }}"
 
     - name: Get Grafana route
       kubernetes.core.k8s_info:
