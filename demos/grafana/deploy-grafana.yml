@@ -389,6 +389,69 @@
                       "defaults": {"unit": "percent", "min": 0, "max": 100}
                     },
                     "options": {"tooltip": {"mode": "single"}}
+                  },
+                  {
+                    "id": 9,
+                    "title": "Cluster PVC Storage Usage",
+                    "type": "gauge",
+                    "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "round(sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100, 0.1)", "legendFormat": "PVC Used %"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 70},
+                            {"color": "red", "value": 85}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+                  },
+                  {
+                    "id": 10,
+                    "title": "Node /var Disk Usage",
+                    "type": "gauge",
+                    "gridPos": {"h": 8, "w": 6, "x": 6, "y": 16},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [{"expr": "round((1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100, 0.1)", "legendFormat": "Disk Used %"}],
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                          "mode": "absolute",
+                          "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 70},
+                            {"color": "red", "value": 85}
+                          ]
+                        }
+                      }
+                    },
+                    "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+                  },
+                  {
+                    "id": 11,
+                    "title": "Storage Usage Over Time",
+                    "type": "timeseries",
+                    "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+                    "datasource": {"type": "prometheus"},
+                    "targets": [
+                      {"expr": "sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100", "legendFormat": "Cluster PVC %"},
+                      {"expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100", "legendFormat": "Node /var %"}
+                    ],
+                    "fieldConfig": {
+                      "defaults": {"unit": "percent", "min": 0, "max": 100}
+                    },
+                    "options": {"tooltip": {"mode": "multi"}}
                   }
                 ]
               }
