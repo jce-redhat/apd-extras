@@ -1,0 +1,216 @@
+{
+  "title": "OpenShift Cluster Overview",
+  "uid": "ocp-cluster-overview",
+  "description": "Cluster-wide CPU, memory, pod, and node metrics from OpenShift Prometheus",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["openshift", "cluster", "infrastructure"],
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cluster CPU Usage",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100, 0.1)", "legendFormat": "CPU %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 2,
+      "title": "Cluster Memory Usage",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100, 0.1)", "legendFormat": "Memory %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 3,
+      "title": "Running Pods",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_pod_status_phase{phase=\"Running\"} == 1)", "legendFormat": "Running"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 4,
+      "title": "Ready Nodes",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "legendFormat": "Ready"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 5,
+      "title": "Pods Not Running",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 4},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"} == 1) or vector(0)", "legendFormat": "Not Running"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 5}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 6,
+      "title": "Not-Ready Nodes",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "count(kube_node_info) - count(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) or vector(0)", "legendFormat": "Not Ready"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 7,
+      "title": "CPU Usage Over Time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100", "legendFormat": "CPU %"}],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 8,
+      "title": "Memory Usage Over Time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory %"}],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 9,
+      "title": "Cluster PVC Storage Usage",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round(sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100, 0.1)", "legendFormat": "PVC Used %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 10,
+      "title": "Node /var Disk Usage",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [{"expr": "round((1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100, 0.1)", "legendFormat": "Disk Used %"}],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true}
+    },
+    {
+      "id": 11,
+      "title": "Storage Usage Over Time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "prometheus"},
+      "targets": [
+        {"expr": "sum(kubelet_volume_stats_used_bytes) / sum(kubelet_volume_stats_capacity_bytes) * 100", "legendFormat": "Cluster PVC %"},
+        {"expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/var\",fstype=\"xfs\"} / node_filesystem_size_bytes{mountpoint=\"/var\",fstype=\"xfs\"}) * 100", "legendFormat": "Node /var %"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100}
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    }
+  ]
+}
