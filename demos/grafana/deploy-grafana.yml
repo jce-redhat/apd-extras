@@ -20,7 +20,7 @@
 
     - name: Set Grafana root URL
       ansible.builtin.set_fact:
-        _grafana_root_url: 'https://apd-grafana-route-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}'
+        _grafana_root_url: 'https://{{ _namespace }}-route-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}'
 
     - name: Create Grafana namespace
       kubernetes.core.k8s:
@@ -150,10 +150,10 @@
           apiVersion: grafana.integreatly.org/v1beta1
           kind: Grafana
           metadata:
-            name: apd-grafana
+            name: '{{ _namespace }}'
             namespace: '{{ _namespace }}'
             labels:
-              dashboards: apd-grafana
+              dashboards: '{{ _namespace }}'
           spec:
             config:
               server:
@@ -190,7 +190,7 @@
       kubernetes.core.k8s_info:
         api_version: apps/v1
         kind: Deployment
-        name: apd-grafana-deployment
+        name: '{{ _namespace }}-deployment'
         namespace: '{{ _namespace }}'
       register: _grafana_deploy
       until: >
@@ -211,7 +211,7 @@
           spec:
             instanceSelector:
               matchLabels:
-                dashboards: apd-grafana
+                dashboards: '{{ _namespace }}'
             datasource:
               name: OpenShift Prometheus
               type: prometheus
@@ -237,7 +237,7 @@
           spec:
             instanceSelector:
               matchLabels:
-                dashboards: apd-grafana
+                dashboards: '{{ _namespace }}'
             json: "{{ lookup('template', 'dashboards/openshift-cluster-overview.json') }}"
 
     - name: Display Grafana access information

@@ -29,7 +29,7 @@
         api_version: grafana.integreatly.org/v1beta1
         kind: Grafana
         namespace: '{{ _namespace }}'
-        name: apd-grafana
+        name: '{{ _namespace }}'
 
     - name: Remove Prometheus ClusterRoleBinding
       kubernetes.core.k8s:
