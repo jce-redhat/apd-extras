@@ -5,3 +5,4 @@
 **/ansible-navigator.log
 **/navigator-output/
 collections/ansible_collections/
+*.swp
