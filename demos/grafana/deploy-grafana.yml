@@ -250,7 +250,7 @@
             instanceSelector:
               matchLabels:
                 dashboards: apd-grafana
-            json: "{{ lookup('file', 'dashboards/openshift-cluster-overview.json') }}"
+            json: "{{ lookup('file', 'dashboards/openshift-cluster-overview.json') | to_json }}"
 
     - name: Display Grafana access information
       ansible.builtin.debug:
