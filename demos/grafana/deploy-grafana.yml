@@ -11,6 +11,17 @@
     _thanos_url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
 
   tasks:
+    - name: Get cluster ingress domain
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: _cluster_ingress
+
+    - name: Set Grafana root URL
+      ansible.builtin.set_fact:
+        _grafana_root_url: 'https://apd-grafana-route-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}'
+
     - name: Create Grafana namespace
       kubernetes.core.k8s:
         state: present
@@ -145,6 +156,8 @@
               dashboards: apd-grafana
           spec:
             config:
+              server:
+                root_url: '{{ _grafana_root_url }}'
               security:
                 admin_user: admin
                 admin_password: '{{ _admin_password }}'
