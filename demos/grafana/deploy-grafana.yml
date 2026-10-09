@@ -225,20 +225,15 @@
               secureJsonData:
                 httpHeaderValue1: 'Bearer {{ _token_secret.resources[0].data.token | b64decode }}'
 
+    - name: Render dashboard CR to temp file
+      ansible.builtin.template:
+        src: dashboards/openshift-cluster-overview-cr.yaml.j2
+        dest: /tmp/grafana-dashboard-cluster-overview.yaml
+
     - name: Deploy OpenShift cluster overview dashboard
       kubernetes.core.k8s:
         state: present
-        definition:
-          apiVersion: grafana.integreatly.org/v1beta1
-          kind: GrafanaDashboard
-          metadata:
-            name: openshift-cluster-overview
-            namespace: '{{ _namespace }}'
-          spec:
-            instanceSelector:
-              matchLabels:
-                dashboards: '{{ _namespace }}'
-            json: "{{ lookup('template', 'dashboards/openshift-cluster-overview.json') }}"
+        src: /tmp/grafana-dashboard-cluster-overview.yaml
 
     - name: Display Grafana access information
       ansible.builtin.debug:
