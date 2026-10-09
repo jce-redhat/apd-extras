@@ -161,6 +161,10 @@
               security:
                 admin_user: admin
                 admin_password: '{{ _admin_password }}'
+                cookie_secure: "true"
+              feature_toggles:
+                improvedExternalSessionHandling: "false"
+                useSessionStorageForRedirection: "false"
               log:
                 mode: console
             route:
