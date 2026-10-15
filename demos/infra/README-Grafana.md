@@ -31,8 +31,8 @@ All deployment parameters are hardcoded for the APD catalog environment:
 |---|---|
 | Grafana namespace | `apd-grafana` |
 | AAP namespace | `aap` |
-| PVC size | `1Gi` (Ceph RBD) |
-| Admin password | Same as the `aap_password` value from the AAP Credential (falls back to `changeme`) |
+| PVC size | `1Gi` |
+| Admin password | `aap_password` from the AAP Credential |
 
 ## Architecture
 

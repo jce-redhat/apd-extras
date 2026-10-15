@@ -4,10 +4,9 @@
   gather_facts: false
 
   vars:
-    # values are hardcoded for APD catalog item in RHDP.  admin password defaults to the
-    # AAP admin password set in the AAP credential attached to the job template
+    # values are hardcoded for APD catalog item in RHDP
     _namespace: 'apd-grafana'
-    _admin_password: '{{ aap_password | default("changeme") }}'
+    _admin_password: '{{ aap_password }}'
     _storage_size: '1Gi'
     _storage_class: ocs-external-storagecluster-ceph-rbd
     _thanos_url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
@@ -17,6 +16,14 @@
       - aap-resources
 
   tasks:
+    - name: Ensure AAP Credential is attached and aap_password is set
+      ansible.builtin.assert:
+        that:
+          - aap_password is defined and aap_password | length > 0
+        fail_msg: >
+          The AAP Credential must be attached to this job template so that
+          aap_password is available to set the Grafana admin password.
+
     - name: Get cluster ingress domain
       kubernetes.core.k8s_info:
         api_version: config.openshift.io/v1
