@@ -1,0 +1,27 @@
+---
+controller_templates:
+  - name: Infoblox | Create DNS zones and records
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - Infoblox
+    project: APD Extras
+    playbook: demos/manage-infoblox/create-infoblox-records.yml
+    survey_enabled: true
+    survey:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Forward zone name
+          variable: forward_zone
+          required: true
+          type: text
+          default: apd.example.com
+        - question_name: Reverse zone CIDR
+          variable: reverse_zone_cidr
+          required: true
+          type: text
+          default: 10.1.0.0/24
+
+...
+# vim: ft=yaml.ansible

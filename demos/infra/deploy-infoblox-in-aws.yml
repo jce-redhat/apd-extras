@@ -16,15 +16,16 @@
     _instance_type: '{{ vnios_instance_type | default("m5.large") }}'
     _instance_owner: '{{ vnios_instance_owner | default(create_vm_aws_owner_tag) | default("Ansible Product Demos") }}'
     _keypair_name: '{{ vnios_keypair_name | default("aws-test-key") }}'
+    _admin_password: '{{ aap_password }}'
 
   tasks:
-    - name: Ensure initial Infoblox password variable is set
+    - name: Ensure AAP Credential is attached and aap_password is set
       ansible.builtin.assert:
         that:
-          - 'lookup("env", "INFOBLOX_PASSWORD") | length > 0'
+          - aap_password is defined and aap_password | length > 0
         fail_msg: >
-          'INFOBLOX_PASSWORD' variable must be set, either as an environment
-          variable or in an attached AAP credential
+          The AAP Credential must be attached to this job template so that
+          aap_password is available to set the Infoblox admin password.
 
     - name: Retrieve VPC info
       amazon.aws.ec2_vpc_net_info:
@@ -105,6 +106,17 @@
       ansible.builtin.set_fact:
         _eni_ids: '{{ _eni.results | map(attribute="interface") | map(attribute="id") }}'
 
+    - name: Check if Infoblox instance already exists
+      amazon.aws.ec2_instance_info:
+        region: "{{ _aws_region }}"
+        filters:
+          'tag:Name': "{{ _instance_name }}"
+          instance-state-name: running
+      register: _existing_instance
+
+    # ec2_instance crashes (AttributeError in change_network_attachments) when
+    # interfaces are specified as strings and the instance already exists.  Skip
+    # the task entirely on re-runs to avoid the bug.
     - name: Create Infoblox instance
       amazon.aws.ec2_instance:
         name: "{{ _instance_name }}"
@@ -119,7 +131,6 @@
         region: "{{ _aws_region }}"
         tags:
           Name: "{{ _instance_name }}"
-          owner: "{{ _instance_owner }}"
         vpc_subnet_id: "{{ _subnet_id }}"
         # for temp_license information, see:
         # https://docs.infoblox.com/space/nios90/220168268/set+temp_license
@@ -127,9 +138,25 @@
         user_data: |
           #infoblox-config
           remote_console_enabled: yes
-          default_admin_password: {{ lookup("env", "INFOBLOX_PASSWORD") }}
+          default_admin_password: {{ _admin_password }}
           temp_license: nios IB-V926 enterprise dns dhcp cloud
-      register: _vnios_instance_info
+      register: _new_instance
+      when: _existing_instance.instances | length == 0
+
+    - name: Set instance info fact
+      ansible.builtin.set_fact:
+        _vnios_instance_info: >-
+          {{ _new_instance if _existing_instance.instances | length == 0
+             else {"instance_ids": [_existing_instance.instances[0].instance_id]} }}
+
+    - name: Tag Infoblox instance
+      amazon.aws.ec2_tag:
+        region: "{{ _aws_region }}"
+        resource: "{{ _vnios_instance_info.instance_ids[0] }}"
+        tags:
+          owner: "{{ _instance_owner }}"
+          managed-by: aap-product-demos
+          apd: "true"
 
     - name: Set delete-on-terminate for ENIs
       amazon.aws.ec2_eni:
