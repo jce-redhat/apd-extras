@@ -308,18 +308,10 @@ controller_workflows:
         unified_job_template: Cloud | AWS | Create Keypair
         success_nodes:
           - Create Infoblox instance
-        failure_nodes:
-          - Ticket - Keypair Failed
       - identifier: Create VPC
         unified_job_template: Cloud | AWS | Create VPC
         success_nodes:
           - Create Infoblox instance
-        failure_nodes:
-          - Ticket - VPC Failed
-      - identifier: Ticket - Keypair Failed
-        unified_job_template: SUBMIT FEEDBACK
-        extra_data:
-          feedback: Failed to create AWS keypair
       - identifier: Create Infoblox instance
         unified_job_template: Infra | Infoblox | Create Infoblox instance in AWS
         all_parents_must_converge: true
@@ -331,10 +323,6 @@ controller_workflows:
           - Update Infoblox credential
       - identifier: Update Infoblox credential
         unified_job_template: Infra | Infoblox | Update Infoblox credential
-      - identifier: Ticket - VPC Failed
-        unified_job_template: SUBMIT FEEDBACK
-        extra_data:
-          feedback: Failed to create AWS VPC
 
   - name: Infra | Infoblox | Delete Infoblox instance from AWS
     description: Terminate the Infoblox virtual appliance in AWS
