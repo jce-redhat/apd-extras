@@ -1,0 +1,30 @@
+---
+controller_templates:
+  - name: Test APD Nginx | Deploy landing page
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/test-apd-nginx/deploy-content.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+  - name: Test APD Nginx | Remove landing page
+    labels:
+      - infrastructure
+      - openshift
+    job_type: run
+    inventory: Ansible Product Demos Inventory
+    credentials:
+      - OpenShift Credential
+    project: APD Extras
+    playbook: demos/test-apd-nginx/delete-content.yml
+    execution_environment: Product Demos EE
+    survey_enabled: false
+
+...
+# vim: ft=yaml.ansible

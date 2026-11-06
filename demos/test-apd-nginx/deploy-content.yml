@@ -1,0 +1,93 @@
+---
+- name: Deploy test-apd-nginx landing page to Nginx PVC
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _nginx_namespace: 'apd-nginx'
+    _content_dir: 'test-apd-nginx'
+    _docroot: '/usr/share/nginx/html'
+    _local_staging: '/tmp/test-apd-nginx'
+
+  tasks:
+    - name: Get cluster ingress domain
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: _cluster_ingress
+
+    - name: Get nginx pod name
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: '{{ _nginx_namespace }}'
+        label_selectors:
+          - app=apd-nginx
+      register: _nginx_pod
+
+    - name: Ensure nginx pod is running
+      ansible.builtin.assert:
+        that:
+          - _nginx_pod.resources | length > 0
+          - _nginx_pod.resources[0].status.phase == 'Running'
+        fail_msg: >
+          No running nginx pod found in namespace {{ _nginx_namespace }}.
+          Deploy the Nginx infra demo first.
+
+    - name: Create local staging directory
+      ansible.builtin.file:
+        path: '{{ _local_staging }}'
+        state: directory
+        mode: '0755'
+
+    - name: Write landing page to staging directory
+      ansible.builtin.copy:
+        dest: '{{ _local_staging }}/index.html'
+        mode: '0644'
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Test APD Nginx Demo</title>
+            <style>
+              body { font-family: sans-serif; max-width: 640px; margin: 4rem auto; text-align: center; color: #333; }
+              h1 { color: #e00; }
+              .badge { display: inline-block; background: #e00; color: #fff; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.85rem; margin-bottom: 1rem; }
+              p { line-height: 1.6; }
+              code { background: #f4f4f4; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.9rem; }
+            </style>
+          </head>
+          <body>
+            <div class="badge">Ansible Product Demos</div>
+            <h1>test-apd-nginx</h1>
+            <p>This page was deployed by an Ansible playbook into the
+            <code>apd-nginx-web-content</code> PVC under
+            <code>/test-apd-nginx/</code>.</p>
+            <p>Content is served by the APD Nginx web server running in
+            the <code>apd-nginx</code> namespace on OpenShift.</p>
+          </body>
+          </html>
+
+    - name: Copy content directory into nginx pod
+      kubernetes.core.k8s_cp:
+        namespace: '{{ _nginx_namespace }}'
+        pod: '{{ _nginx_pod.resources[0].metadata.name }}'
+        container: nginx
+        remote_path: '{{ _docroot }}/{{ _content_dir }}'
+        local_path: '{{ _local_staging }}'
+        state: to_pod
+
+    - name: Display content URL
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Content deployed successfully!"
+          - "======================================="
+          - "URL: https://apd-nginx-apd-nginx.{{ _cluster_ingress.resources[0].spec.domain }}/{{ _content_dir }}/"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible

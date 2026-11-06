@@ -1,0 +1,243 @@
+---
+- name: Deploy APD Nginx web server on OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: 'apd-nginx'
+    _pvc_name: 'apd-nginx-web-content'
+    _storage_size: '1Gi'
+    # CephFS supports ReadWriteMany so other demo pods can mount and write content
+    _storage_class: ocs-external-storagecluster-cephfs
+    _app_name: apd-nginx
+    _alias_name: apd-content
+
+  tasks:
+    - name: Get cluster ingress domain
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: _cluster_ingress
+
+    - name: Create nginx namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: '{{ _namespace }}'
+
+    - name: Create PVC for web content
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: '{{ _pvc_name }}'
+            namespace: '{{ _namespace }}'
+          spec:
+            accessModes:
+              - ReadWriteMany
+            resources:
+              requests:
+                storage: '{{ _storage_size }}'
+            storageClassName: '{{ _storage_class }}'
+
+    - name: Create nginx config with autoindex enabled
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: '{{ _app_name }}-config'
+            namespace: '{{ _namespace }}'
+          data:
+            default.conf: |
+              server {
+                  listen 8080;
+                  server_name localhost;
+                  location / {
+                      root  /usr/share/nginx/html;
+                      index index.html index.htm;
+                      autoindex on;
+                  }
+                  error_page 500 502 503 504 /50x.html;
+                  location = /50x.html {
+                      root /usr/share/nginx/html;
+                  }
+              }
+
+    - name: Deploy nginx
+      kubernetes.core.k8s:
+        state: present
+        apply: true
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: '{{ _app_name }}'
+            namespace: '{{ _namespace }}'
+            labels:
+              app: '{{ _app_name }}'
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: '{{ _app_name }}'
+            template:
+              metadata:
+                labels:
+                  app: '{{ _app_name }}'
+              spec:
+                initContainers:
+                  - name: init-content
+                    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        if [ ! -f /content/index.html ]; then
+                          cat > /content/index.html <<'HTMLEOF'
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                          <meta charset="UTF-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                          <title>Ansible Product Demos</title>
+                          <style>
+                            body { font-family: sans-serif; max-width: 600px; margin: 4rem auto; text-align: center; color: #333; }
+                            h1 { color: #e00; }
+                            p { line-height: 1.6; }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>Ansible Product Demos</h1>
+                          <p>This web server is ready. Deploy a demo to populate content.</p>
+                        </body>
+                        </html>
+                        HTMLEOF
+                        fi
+                    volumeMounts:
+                      - name: web-content
+                        mountPath: /content
+                containers:
+                  - name: nginx
+                    # nginx-unprivileged runs as non-root on port 8080, compatible with OpenShift SCCs
+                    image: docker.io/nginxinc/nginx-unprivileged:stable-alpine
+                    ports:
+                      - containerPort: 8080
+                    volumeMounts:
+                      - name: web-content
+                        mountPath: /usr/share/nginx/html
+                      - name: nginx-config
+                        mountPath: /etc/nginx/conf.d/default.conf
+                        subPath: default.conf
+                    readinessProbe:
+                      httpGet:
+                        path: /
+                        port: 8080
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /
+                        port: 8080
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+                volumes:
+                  - name: web-content
+                    persistentVolumeClaim:
+                      claimName: '{{ _pvc_name }}'
+                  - name: nginx-config
+                    configMap:
+                      name: '{{ _app_name }}-config'
+
+    - name: Create nginx Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: '{{ _app_name }}'
+            namespace: '{{ _namespace }}'
+          spec:
+            selector:
+              app: '{{ _app_name }}'
+            ports:
+              - port: 8080
+                targetPort: 8080
+
+    - name: Create nginx Route
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: '{{ _app_name }}'
+            namespace: '{{ _namespace }}'
+          spec:
+            to:
+              kind: Service
+              name: '{{ _app_name }}'
+            port:
+              targetPort: 8080
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Create alias Route
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: '{{ _alias_name }}'
+            namespace: '{{ _namespace }}'
+          spec:
+            host: '{{ _alias_name }}.{{ _cluster_ingress.resources[0].spec.domain }}'
+            to:
+              kind: Service
+              name: '{{ _app_name }}'
+            port:
+              targetPort: 8080
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+
+    - name: Wait for nginx deployment to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: '{{ _app_name }}'
+        namespace: '{{ _namespace }}'
+      register: _nginx_deploy
+      until: >
+        _nginx_deploy.resources | length > 0 and
+        (_nginx_deploy.resources[0].status.readyReplicas | default(0)) | int >= 1
+      retries: 30
+      delay: 10
+
+    - name: Display nginx access information
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Nginx deployed successfully!"
+          - "======================================="
+          - "URL: https://{{ _app_name }}-{{ _namespace }}.{{ _cluster_ingress.resources[0].spec.domain }}"
+          - "Alias URL: https://{{ _alias_name }}.{{ _cluster_ingress.resources[0].spec.domain }}"
+          - "PVC: {{ _pvc_name }} (namespace: {{ _namespace }})"
+          - "Mount path: /usr/share/nginx/html"
+          - "======================================="
+          - "To serve demo content, copy files into the PVC."
+          - "Other demos can reference this PVC by name: {{ _pvc_name }}"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible

@@ -1,0 +1,36 @@
+---
+- name: Remove APD Nginx web server from OpenShift
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _namespace: 'apd-nginx'
+
+  tasks:
+    - name: Delete nginx namespace
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: '{{ _namespace }}'
+
+    - name: Wait for namespace to be fully removed
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: '{{ _namespace }}'
+      register: _ns
+      until: _ns.resources | length == 0
+      retries: 30
+      delay: 10
+
+    - name: Display removal results
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Nginx removed successfully"
+          - "Namespace '{{ _namespace }}' deleted"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible

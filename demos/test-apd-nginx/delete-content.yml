@@ -1,0 +1,44 @@
+---
+- name: Remove test-apd-nginx content from Nginx PVC
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _nginx_namespace: 'apd-nginx'
+    _content_dir: 'test-apd-nginx'
+    _docroot: '/usr/share/nginx/html'
+
+  tasks:
+    - name: Get nginx pod name
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: '{{ _nginx_namespace }}'
+        label_selectors:
+          - app=apd-nginx
+      register: _nginx_pod
+
+    - name: Ensure nginx pod is running
+      ansible.builtin.assert:
+        that:
+          - _nginx_pod.resources | length > 0
+          - _nginx_pod.resources[0].status.phase == 'Running'
+        fail_msg: >
+          No running nginx pod found in namespace {{ _nginx_namespace }}.
+
+    - name: Remove content subdirectory
+      kubernetes.core.k8s_exec:
+        namespace: '{{ _nginx_namespace }}'
+        pod: '{{ _nginx_pod.resources[0].metadata.name }}'
+        command: 'rm -rf {{ _docroot }}/{{ _content_dir }}'
+
+    - name: Display removal results
+      ansible.builtin.debug:
+        msg:
+          - "======================================="
+          - "Content removed successfully"
+          - "Directory '{{ _content_dir }}' deleted from PVC"
+          - "======================================="
+
+...
+# vim: ft=yaml.ansible
